@@ -20,7 +20,7 @@ def generate_quad_integrals(q):
         L = (li * lj * lm * ln).integ()
         # the desired result is (L(1) - L(-1)) / 2 (as this is for non-shifted Legendre)
         #  but since L(1) == -L(-1), this is just L(1)
-        return L(1)  
+        return L(1)
 
     w = np.zeros((q, q, q, q))
     for i in range(q):
@@ -50,28 +50,33 @@ def generate_delta_identity(q_a, q_p):
     return d
 
 class LLP(nengo.Network):
-    def __init__(self):#, n_neurons=1000, dimensions=1, q=6, theta=1, dt=0.001)
-        n_neurons = 1000
+    def __init__(self, n_neurons=1000, dimensions=1, q=6, theta=1, dt=0.001):
         dimensions = 1
-        theta = 1
-        dt = 0.001
+        if dimensions != 1:
+            raise NotImplementedError
+        self.theta = theta
         # Legendre dimensionality
-        q = 6
-        q_a = 6
-        q_p = 6
-        # get the number of steps in our window, this tells us how much data to cut
-        # off the start for our GT, and how much to cut off the end for our state data
-        window_size = int(theta/dt)
+        q_a = q
+        q_p = q
+        q_r = q
 
-        # Generate or load training data
-        # state_data = np.load("training_2022_01_03-12_10_57.npz")['q']
-        data = np.sin(np.arange(0, np.pi*10, dt))#[:, np.newaxis]
-
-        # Pass input to LDN to generate the Legendre coefficient to train off
-        # We are trying to predict theta into the future, so remove the first theta seconds
-        # from the target data, and the last theta seconds for the eval points
-        state = LDN(theta=theta, q=q).apply(data[:-window_size][:, np.newaxis])
-        gt_predictions = LDN(theta=theta, q=q).apply(data[window_size:][:, np.newaxis])
+        # stored sizes of nodes for cleaner code
+        shapes = {
+                'A': (n_neurons, q_a),
+                'M': (q_p, dimensions, q),
+                'Q': (q_a, q, q_p, q_r),
+                'S': (q_r, q_r),
+                'z': dimensions,
+                'd': (q_a, q_r),
+                'QS': (q_a, q_p),
+                'MQS': (q_a, dimensions, q),
+                'zd': (q_a, q_r, dimensions),
+                'D': (n_neurons, q_r, dimensions),
+                'Z': (dimensions, q)
+        }
+        sizes = {}
+        for key in shapes:
+            sizes[key] = np.prod(shapes[key])
 
         model = nengo.Network()
         # true to adjust encoders
@@ -81,17 +86,21 @@ class LLP(nengo.Network):
         # decoders = nengo.dists.distributions.Uniform(low=0, high=0.1).sample(n_neurons, q, dimensions)
         self.decoders = np.zeros((n_neurons, q, dimensions))
         with model:
-            def input_func(t, x):
-                return np.sin(t)
-                # return data[(int(t/dt))%len(data)]
-            input_node = nengo.Node(input_func, size_in=dimensions, size_out=dimensions, label='input')
+            # TODO fix this for dimensions > 1
+            input_node = nengo.Node(
+                output=nengo.processes.WhiteSignal(
+                    high=3, period=3, rms=0.25, y0=0, seed=3),
+                label=f"stim",
+                # size_in=dimensions,
+                # size_out=dimensions
+            )
 
-            def gt_func(t):
-                return gt_predictions[(int(t/dt))%len(data)]
-            gt_node = nengo.Node(gt_func, size_in=0, size_out=dimensions*q, label='gt')
+            # def gt_func(t):
+            #     return input_func(t+self.theta)
+            # gt_node = nengo.Node(gt_func, size_in=0, size_out=dimensions*q, label='gt')
 
             # Our context held in an LDN
-            ldn_c = nengo.Node(LDN(theta=theta, q=q, size_in=dimensions), label='ldn_c')
+            ldn_c = nengo.Node(LDN(theta=theta, q=q, size_in=dimensions), label='ldn_context')
             nengo.Connection(input_node, ldn_c, synapse=None)
 
             # Our neurons that will predict the future on their output connections
@@ -101,22 +110,24 @@ class LLP(nengo.Network):
             neurons = nengo.Ensemble(
                     n_neurons=n_neurons,
                     dimensions=q*dimensions,
+                    radius=np.sqrt(q*dimensions),
                     # neuron_type=nengo.Direct(),
                     label='neurons')
             nengo.Connection(ldn_c, neurons)
-            # dummy_out = nengo.Node(size_in=q, size_out=q, label='dummy_out')
-            # nengo.Connection(neurons, dummy_out)
 
-            ldn_a = nengo.Node(LDN(theta=theta, q=q_a, size_in=n_neurons), label='ldn_a')
+            ldn_a = nengo.Node(LDN(theta=theta, q=q_a, size_in=n_neurons), label='ldn_activities')
             nengo.Connection(neurons.neurons, ldn_a)
 
             # Constants of learning rule
             Q = generate_quad_integrals(q)
             S = generate_scaling_diagonal(q)
-            # q = input legendre q
-            # a = q_a
-            # p = q_p
-            # r = q_r = q
+            """
+            Legendre Dimensionality
+            q = input
+            a = activities
+            p = prediction
+            r = intermediate in learning rule, r == q
+            """
             QS = np.einsum("qapr, qr->ap", Q, S)
             d = generate_delta_identity(q_a, q_p)
             K = 1e-6
@@ -148,63 +159,82 @@ class LLP(nengo.Network):
                         shape: q_a*q
 
                 """
-                learning = True
                 # TODO figure out indexing into input vector
-                A = x[:n_neurons*q_a]
-                A = np.reshape(A, (n_neurons, q_a))
+                A = x[:sizes['A']]
+                A = np.reshape(A, shapes['A'])
 
-                M = x[n_neurons*q_a:n_neurons*q_a+q_p*q*dimensions]
-                M = np.reshape(M, (q_p, dimensions, q))
+                M = x[sizes['A'] : sizes['A']+sizes['M']]
+                M = np.reshape(M, shapes['M'])
 
-                z = x[n_neurons*q_a+q_p*q*dimensions:n_neurons*q_a+q_p*q*dimensions + dimensions]
-                # z = x[n_neurons*q_a+q_p*q*dimensions:n_neurons*q_a+q_p*q*dimensions + dimensions*q]
-                # z = np.reshape(z, (dimensions, q))
+                z = x[sizes['A']+sizes['M'] : sizes['A']+sizes['M']+sizes['d']]
 
-                if learning:
-                    # print('z: ', z.shape)
-                    # print('d: ', d.shape)
-                    # zd = np.einsum("mq, aq->maq", z, d)
-                    zd = np.einsum("m, aq->maq", z, d)
-                    # print('zd: ', zd.shape)
-                    # print('M: ', M.shape)
-                    # print('QS: ', QS.shape)
-                    MQS = np.einsum("pmq, ap->maq", M, QS)
-                    # print('MQS: ', MQS.shape)
-                    error = MQS - zd
-                    # print('MQS-zd: ', error.shape)
-                    dD = -K * np.einsum("Na, maq->Nqm", A, error)
-                    # print('dD: ', dD.shape)
-                    self.decoders += dD
+                # print('z: ', z.shape)
+                # print('d: ', d.shape)
+                # zd = np.einsum("mq, aq->maq", z, d)
+                zd = np.einsum("m, aq->maq", z, d)
+                # print('zd: ', zd.shape)
+                # print('M: ', M.shape)
+                # print('QS: ', QS.shape)
+                MQS = np.einsum("pmq, ap->maq", M, QS)
+                # print('MQS: ', MQS.shape)
+                error = MQS - zd
+                # print('MQS-zd: ', error.shape)
+                dD = -K * np.einsum("Na, maq->Nqm", A, error)
+                # print('dD: ', dD.shape)
+                self.decoders += dD
+                decoders = np.ravel(self.decoders).tolist()
+                return decoders
 
-                y = np.einsum("Nq, Nqm->qm", A, self.decoders)
+            def forward(t, x):
+                A = x[:sizes['A']]
+                A = np.reshape(A, shapes['A'])
+                decoders = x[sizes['A']:]
+                decoders = np.reshape(decoders, shapes['D'])
+
+                y = np.einsum("Nq, Nqm->qm", A, decoders)
                 # print(y.shape)
                 return np.ravel(y.tolist())
 
             # prediction in legendre space, stored in an LDN
-            z = nengo.Node(
+            learning_rule = nengo.Node(
                     llp_learning_rule,
-                    # size_in=n_neurons*q_a + q_p*q*dimensions + dimensions*q,
-                    size_in=n_neurons*q_a + q_p*q*dimensions + dimensions,
-                    size_out=dimensions*q,
-                    label='z')
+                    size_in=sizes['A'] + sizes['M'] + sizes['z'],
+                    size_out=sizes['D'],
+                    label='learning_rule'
+            )
+
+            z = nengo.Node(
+                    forward,
+                    size_in=sizes['A'] + sizes['D'],
+                    size_out=sizes['Z'],
+                    label='Z'
+            )
 
             # store our predictions for use in the learning rule
-            ldn_z = nengo.Node(LDN(theta=theta, q=q_p, size_in=q*dimensions), label='ldn_z')
-            nengo.Connection(z, ldn_z, synapse=None)
+            ldn_Z = nengo.Node(LDN(theta=theta, q=q_p, size_in=q*dimensions), label='ldn_Z')
+            nengo.Connection(z, ldn_Z, synapse=None)
 
-            # where our learning will happen
+            # Input to learning rule
             nengo.Connection(
                 ldn_a,
-                z[:n_neurons*q_a])
+                learning_rule[:sizes['A']])
 
             nengo.Connection(
-                ldn_z,
-                z[n_neurons*q_a:n_neurons*q_a + q_p*q*dimensions])
+                ldn_Z,
+                learning_rule[sizes['A'] : sizes['A']+sizes['M']])
 
             nengo.Connection(
-                # gt_node,
                 input_node,
-                z[n_neurons*q_a+q_p*q*dimensions:n_neurons*q_a+q_p*q*dimensions + dimensions])
+                learning_rule[sizes['A']+sizes['M']:])
+
+            # input to forward pass in legendre space
+            nengo.Connection(
+                ldn_a,
+                z[:sizes['A']])
+
+            nengo.Connection(
+                learning_rule,
+                z[sizes['A']:])
 
 
             prediction_nodes = []

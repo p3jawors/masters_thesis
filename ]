@@ -1,0 +1,71 @@
+# Import numpy and matplotlib
+import numpy as np
+import matplotlib.pyplot as plt
+
+import nengo
+from nengo.processes import WhiteSignal
+
+def LDN(n_neurons, q, theta, Tau, eval_points=None, target=None, show_ldn=True, seed=0):
+    # Calculate Pade approximants
+    A = np.zeros((q, q))
+    B = np.zeros((q, 1))
+    for i in range(q):
+        B[i] = (-1.)**i * (2*i+1)
+        for j in range(q):
+            A[i,j] = (2*i+1)*(-1 if i<j else (-1.)**(i-j+1))
+    A = A / theta
+    B = B / theta
+    Ap = Tau*A + np.eye(A.shape[0])
+    Bp = Tau*B
+
+    model = nengo.Network(seed=seed)
+    with model:
+        ldn = nengo.Ensemble(
+            n_neurons=n_neurons[0],
+            dimensions=q
+        )
+        # stim = nengo.Node(lambda t: np.sin(2*np.pi*t) if t<2 else np.sin(2*np.pi*t*2))
+        stim = nengo.Node(WhiteSignal(60, high=5), size_out=1)
+        stim_p = nengo.Probe(stim, synapse=0.1)
+        # output_node = nengo.Node(size_in=1, size_out=1)
+
+        nengo.Connection(stim, ldn, transform=Bp, synapse=0.1)
+        nengo.Connection(ldn, ldn, transform=Ap, synapse=0.1)
+        ldn_probe = nengo.Probe(ldn, synapse=0.1)
+
+        # decision = nengo.Ensemble(n_neurons=n_neurons[1], dimensions=1)
+        # nengo.Connection(ldn, decision, eval_points=eval_points, function=target)
+        # decision_probe = nengo.Probe(decision, synapse=0.01)
+        #nengo.Connection(ens, output_node)
+
+        #out_probe = nengo.Probe(output_node, synapse=0.1)
+
+    sim = nengo.Simulator(model)
+    with sim:
+        sim.run(4)
+
+    if show_ldn:
+        plt.figure()
+        plt.title('LMU Internal Representation')
+        plt.ylabel('Represented Value')
+        plt.xlabel('Time [sec]')
+        plt.plot(sim.trange(), sim.data[ldn_probe])
+        plt.show()
+
+    xGT = np.ones(len(sim.trange()))
+    xGT[-int(len(sim.trange())/2):] *= -1
+    if flip:
+        xGT *= -1
+    
+    plt.figure()
+    plt.title('LMU Decision')
+    plt.ylabel('1Hz vs 2Hz Decision')
+    plt.xlabel('Time [sec]')
+    plt.plot(sim.trange(), sim.data[decision_probe], label='Decision')
+    plt.plot(sim.trange(), xGT, label='Ground Truth')
+    plt.legend()
+    plt.show()
+    
+    return sim.data[decision_probe]
+
+data = LDN(n_neurons=[1000, 50], Tau=0.1, q=6, theta=0.5)

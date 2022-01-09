@@ -111,7 +111,7 @@ class LLP(nengo.Network):
                     n_neurons=n_neurons,
                     dimensions=q*dimensions,
                     radius=np.sqrt(q*dimensions),
-                    # neuron_type=nengo.Direct(),
+                    neuron_type=nengo.RectifiedLinear(),
                     label='neurons')
             nengo.Connection(ldn_c, neurons)
 
@@ -186,12 +186,12 @@ class LLP(nengo.Network):
                 return decoders
 
             def forward(t, x):
-                A = x[:sizes['A']]
-                A = np.reshape(A, shapes['A'])
-                decoders = x[sizes['A']:]
+                A = x[:n_neurons]
+                # A = np.reshape(A, shapes['A'])
+                decoders = x[n_neurons:]
                 decoders = np.reshape(decoders, shapes['D'])
 
-                y = np.einsum("Nq, Nqm->qm", A, decoders)
+                y = np.einsum("N, Nqm->qm", A, decoders)
                 # print(y.shape)
                 return np.ravel(y.tolist())
 
@@ -205,7 +205,7 @@ class LLP(nengo.Network):
 
             z = nengo.Node(
                     forward,
-                    size_in=sizes['A'] + sizes['D'],
+                    size_in=n_neurons + sizes['D'],
                     size_out=sizes['Z'],
                     label='Z'
             )
@@ -229,12 +229,12 @@ class LLP(nengo.Network):
 
             # input to forward pass in legendre space
             nengo.Connection(
-                ldn_a,
-                z[:sizes['A']])
+                neurons.neurons,
+                z[:n_neurons])
 
             nengo.Connection(
                 learning_rule,
-                z[sizes['A']:])
+                z[n_neurons:])
 
 
             prediction_nodes = []

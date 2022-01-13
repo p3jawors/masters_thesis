@@ -32,7 +32,7 @@ class LLP(nengo.Network):
                 'S': (q_r, q_r),
                 'z': dimensions,
                 'd': (q_a, q_r),
-                'QS': (q_a, q_p),
+                'QS': (q_a, q_p), # NOTE This is wrong should be 4D
                 'MQS': (q_a, dimensions, q),
                 'zd': (q_a, q_r, dimensions),
                 'D': (n_neurons, q_r, dimensions),
@@ -44,6 +44,7 @@ class LLP(nengo.Network):
 
         model = nengo.Network()
         # starting decoders uniformly sampled
+        # TODO remove this from constuctor to get variable outputs (diff weights)
         if decoders is None:
             self.decoders = np.zeros((n_neurons, q, dimensions))
             # decoders = nengo.dists.distributions.Uniform(low=0, high=0.1).sample(n_neurons, q, dimensions)
@@ -61,12 +62,12 @@ class LLP(nengo.Network):
                     n_neurons=n_neurons,
                     dimensions=q*dimensions,
                     radius=np.sqrt(q*dimensions),
-                    # neuron_type=nengo.RectifiedLinear(),
+                    neuron_type=nengo.RectifiedLinear(),
                     label='neurons')
-            nengo.Connection(ldn_c, neurons)
+            nengo.Connection(ldn_c, neurons, synapse=None)
 
             ldn_a = nengo.Node(LDN(theta=theta, q=q_a, size_in=n_neurons), label='ldn_activities')
-            nengo.Connection(neurons.neurons, ldn_a)
+            nengo.Connection(neurons.neurons, ldn_a, synapse=None)
 
             # Constants of learning rule
             """
@@ -80,7 +81,7 @@ class LLP(nengo.Network):
             S = self.generate_scaling_diagonal(q)
             print('Q: ', Q.shape)
             print('S: ', S.shape)
-            QS = np.einsum("qapr, rr->qapr", Q, S)
+            QS = np.einsum("qapr, rr->qapr", Q, S) # TODO try using non repeating indices
             d = self.generate_delta_identity(q_a, q_r)
 
 
@@ -158,20 +159,24 @@ class LLP(nengo.Network):
             # Input to learning rule
             nengo.Connection(
                 ldn_a,
-                z[:sizes['A']])
+                z[:sizes['A']],
+                synapse=None)
 
             nengo.Connection(
                 ldn_Z,
-                z[sizes['A'] : sizes['A']+sizes['M']])
+                z[sizes['A'] : sizes['A']+sizes['M']],
+                synapse=0)
 
             nengo.Connection(
-                self.input,
-                z[sizes['A']+sizes['M'] : sizes['A']+sizes['M']+sizes['z']])
+                self.input, # TODO this should actually be size of output since we might use more dims of input to predict the output
+                z[sizes['A']+sizes['M'] : sizes['A']+sizes['M']+sizes['z']],
+                synapse=None)
 
             # input to forward pass in legendre space
             nengo.Connection(
                 neurons.neurons,
-                z[-n_neurons:])
+                z[-n_neurons:],
+                synapse=None)
 
 
             prediction_nodes = []

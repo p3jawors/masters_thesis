@@ -15,16 +15,22 @@ endc = '\033[0m'
 class LLP(nengo.Network):
     def __init__(
             self, n_neurons=1000, size_in=1, size_out=1, q_a=6, q_p=6, q=6, theta=1.0,
-            dt=0.001, learning=True, decoders=None, K=5e-8):
+            dt=0.001, learning=True, decoders=None, K=5e-8, seed=0, verbose=False, output_r=None):
+
         self.theta = theta
         self.learning = learning
-        # K = dt*K/n_neurons  #NOTE Terrys implementation had this scaling
-        K = K/n_neurons
+        K = dt*K/n_neurons  #NOTE Terrys implementation had this scaling
+        # K = K/n_neurons
         q_r = q
-        print(f"{q=}")
-        print(f"{q_a=}")
-        print(f"{q_r=}")
-        print(f"{q_p=}")
+
+        if output_r is None:
+            output_r = self.theta*np.array([0.25, 0.5, 0.75])
+
+        if verbose:
+            print(f"{q=}")
+            print(f"{q_a=}")
+            print(f"{q_r=}")
+            print(f"{q_p=}")
 
         # stored sizes of nodes for cleaner code
         shapes = {
@@ -55,24 +61,17 @@ class LLP(nengo.Network):
 
         with model:
             self.input = nengo.Node(size_in=size_in, size_out=size_in, label='input')
-            self.gt = nengo.Node(size_in=1, size_out=1, label='gt')
-            # Our context held in an LDN
-            # NOTE CONTEXT DOES NOT HAVE TO BE AN LDN, but has to be enough info to predict future
-            # ex pos and derivative should work
-            # ldn_c = nengo.Node(LDN(theta=theta, q=q, size_in=size_in), label='ldn_context')
-            # nengo.Connection(self.input, ldn_c, synapse=None)
+            self.z = nengo.Node(size_in=size_out, size_out=size_out, label='z')
+            # self.gt = nengo.Node(size_in=1, size_out=1, label='gt')
 
             # Our neurons that will predict the future on their output connections
             neurons = nengo.Ensemble(
                     n_neurons=n_neurons,
-                    # dimensions=q*size_in,
-                    # radius=np.sqrt(q*size_in),
                     dimensions=size_in,
-                    # radius=np.sqrt(size_in),
-                    radius=1,
-                    neuron_type=nengo.RectifiedLinear(),
+                    #radius=np.sqrt(size_in),
+                    # neuron_type=nengo.RectifiedLinear(),
+                    neuron_type=nengo.LIFRate(),
                     label='neurons')
-            # nengo.Connection(ldn_c, neurons, synapse=None)
             nengo.Connection(self.input, neurons, synapse=None)
 
             ldn_a = nengo.Node(LDN(theta=theta, q=q_a, size_in=n_neurons), label='ldn_activities')
@@ -84,12 +83,13 @@ class LLP(nengo.Network):
             q = input
             a = activities
             p = prediction
-            r = intermediate in learning rule, r == q
+            r = result, r == q
             """
             Q = self.generate_quad_integrals(q_a, q, q_p, q_r)
             S = self.generate_scaling_diagonal(q)
-            print('Q: ', Q.shape)
-            print('S: ', S.shape)
+            if verbose:
+                print('Q: ', Q.shape)
+                print('S: ', S.shape)
             QS = np.einsum("qapr, Rr->qapr", Q, S) # TODO try using non repeating indices
             d = self.generate_delta_identity(q_a, q_r)
 
@@ -132,79 +132,77 @@ class LLP(nengo.Network):
                 a = x[-n_neurons:]
 
                 if self.learning:
-                    print('z: ', z.shape)
-                    print('d: ', d.shape)
                     # zd = np.einsum("mq, aq->maq", z, d)
                     zd = np.einsum("m, ar->mar", z, d)
-                    print('zd: ', zd.shape)
-                    print('M: ', M.shape)
-                    print('QS: ', QS.shape)
                     MQS = np.einsum("pmq, qapr->mar", M, QS)
-                    print('MQS: ', MQS.shape)
                     error = np.subtract(MQS,  zd)
-                    print('MQS-zd: ', error.shape)
                     dD = -K * np.einsum("Na, mar->Nrm", A, error)
-                    print('dD: ', dD.shape)
-                    print('decoders: ', self.decoders.shape)
                     self.decoders += dD
                     # decoders = np.ravel(self.decoders).tolist()
+                    if verbose and t < dt:
+                        print('z: ', z.shape)
+                        print('d: ', d.shape)
+                        print('zd: ', zd.shape)
+                        print('M: ', M.shape)
+                        print('QS: ', QS.shape)
+                        print('MQS: ', MQS.shape)
+                        print('MQS-zd: ', error.shape)
+                        print('dD: ', dD.shape)
+                        print('decoders: ', self.decoders.shape)
 
                 y = np.einsum("N, Nqm->qm", a, self.decoders)
-                print('output: ', y.shape)
+                if verbose and t < dt:
+                    print('output: ', y.shape)
                 return np.ravel(y).tolist()
 
-            # prediction in legendre space, stored in an LDN
-            z = nengo.Node(
+            # our prediction of the legendre coefficients that predict the future theta of our input
+            self.Z = nengo.Node(
                     llp_learning_rule,
                     size_in=sizes['A'] + sizes['M'] + sizes['z'] + n_neurons,
                     size_out=sizes['Z'],
-                    label='Z'
+                    label='Z (learn)'
             )
 
-            # store our predictions for use in the learning rule
+            # store our predictions in an LDN for use in the learning rule
+            # this is an ldn storing the values of an ldn
             ldn_Z = nengo.Node(LDN(theta=theta, q=q_p, size_in=q*size_out), label='ldn_Z')
-            nengo.Connection(z, ldn_Z, synapse=None)
+            nengo.Connection(self.Z, ldn_Z, synapse=None)
 
-            # Input to learning rule
+            # == Input to learning rule ==
+            # LDN of activities
             nengo.Connection(
                 ldn_a,
-                z[:sizes['A']],
+                self.Z[:sizes['A']],
                 synapse=None)
 
+            # LDN of predictions
             nengo.Connection(
                 ldn_Z,
-                z[sizes['A'] : sizes['A']+sizes['M']],
+                self.Z[sizes['A'] : sizes['A']+sizes['M']],
                 synapse=0)
 
+            # the current state of the dimension we are trying to predict the future window of
             nengo.Connection(
-                self.input, # TODO this should actually be size of output since we might use more dims of input to predict the output
-                z[sizes['A']+sizes['M'] : sizes['A']+sizes['M']+size_in],
+                self.z,
+                self.Z[sizes['A']+sizes['M'] : sizes['A']+sizes['M']+sizes['z']],
                 synapse=None)
 
-            # input to forward pass in legendre space
+            # our current neural activity
             nengo.Connection(
                 neurons.neurons,
-                z[-n_neurons:],
+                self.Z[-n_neurons:],
                 synapse=None)
 
 
-            # prediction_nodes = []
-            theta_ps = [0.25]
-            prediction_node = nengo.Node(None, size_in=len(theta_ps) + 1, label='Predictions')
+            # prediction_node = nengo.Node(None, size_in=len(output_r) + 1, label='Predictions')
+            #
+            # # TODO generalize the connection sizes, currently assuming dim 0 is the state we are predicting
+            # nengo.Connection(self.z, prediction_node[0])
+            # nengo.Connection(
+            #         Z,
+            #         prediction_node[1:],
+            #         transform=LDN(q=q, theta=self.theta).get_weights_for_delays(output_r))
 
-            # TODO generalize the connection sizes
-            nengo.Connection(self.input[0], prediction_node[0])
-            # nengo.Connection(self.gt, prediction_node[0])
-            nengo.Connection(
-                    z,
-                    prediction_node[1:],
-                    transform=LDN(q=q, theta=self.theta).get_weights_for_delays(theta_ps))
-
-            # prediction_probes = []
-            # for r in theta_ps:
-            #     prediction_nodes.append(nengo.Node(DecodeLDN(q, r), label=f'z(r={r})'))
-            #     nengo.Connection(z, prediction_nodes[-1], synapse=None)
-            #     # prediction_probes.append(nengo.Probe(prediction_nodes[-1].output, synapse=0.01))
 
     # NOTE: credit LLP patent for this function
     def generate_quad_integrals(self, q_a, q, q_p, q_r):
@@ -224,7 +222,7 @@ class LLP(nengo.Network):
                         if (i+j+m-n >= 0) and ((i+j+m-n) % 2 == 0):
                             v = quad(i, j, m, n)
                             for index in itertools.permutations([i, j, m, n]):
-                                # TODO catch these properly
+                                # TODO catch these properly with somthing like filter()
                                 try:
                                     w[index] = v
                                 except Exception as e:
@@ -251,24 +249,38 @@ class LLP(nengo.Network):
 
 model = nengo.Network()
 with model:
-    llp = LLP(size_in=2)
-    f = 2
+    theta = 0.5
+    output_r = np.array([0.2, 0.4, 0.6, 0.8, 1.0])
+    llp = LLP(
+            n_neurons=1000,
+            size_in=2,
+            size_out=1,
+            q_a=6,
+            q_p=6,
+            q=6,
+            theta=theta,
+            dt=0.001,
+            learning=True,
+            decoders=None,
+            K=5e-5,
+            seed=0,
+            verbose=True,
+            output_r=output_r
+    )
+
+    f = 5
     input_node = nengo.Node(
             lambda t: [np.sin(t*np.pi*2*f), np.cos(t*np.pi*2*f)],
             size_in=0, size_out=2)
 
-    gt_node = nengo.Node(
-            lambda t: [np.sin((t+0.25)*np.pi*2*f)],
-            size_in=0, size_out=1)
+    # gt_node = nengo.Node(
+    #         lambda t: [np.sin((t+0.25)*np.pi*2*f)],
+    #         size_in=0, size_out=1)
 
-    # input_node = nengo.Node(
-    #     output=nengo.processes.WhiteSignal(
-    #         high=3, period=3, rms=0.25, y0=0, seed=3),
-    #     label=f"stim",
-    # )
     nengo.Connection(input_node, llp.input, synapse=None)
-    nengo.Connection(gt_node, llp.gt, synapse=None)
+    nengo.Connection(input_node[0], llp.z, synapse=None)
+    # nengo.Connection(gt_node, llp.gt, synapse=None)
 
-sim = nengo.Simulator(model)
-with sim:
-    sim.run(0.001)
+# sim = nengo.Simulator(model)
+# with sim:
+#     sim.run(0.001)

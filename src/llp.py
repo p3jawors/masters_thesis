@@ -292,7 +292,7 @@ if __name__ == '__main__':
 
     animate = True
     window = theta*5
-    step = dt*10
+    step = dt*100
 
     plt.figure()
     plt.title('Predictions over time')

@@ -12,6 +12,8 @@ from nengo_control.controllers.path_planners.path_planner_node import PathPlanne
 from abr_control.controllers.path_planners import PathPlanner
 from abr_control.controllers.path_planners.position_profiles import Linear
 from abr_control.controllers.path_planners.velocity_profiles import Gaussian
+from abr_analyze import DataHandler
+from plotting import plot_pred
 
 # Test begins here
 airsim_dt = 0.01
@@ -163,10 +165,11 @@ try:
         #             xyz=xyz,
         #             orientation=[0, 0, 0])
 
+        llp_size_out = 3
         llp = LLP(
                 n_neurons=1000,
                 size_in=7,
-                size_out=3,
+                size_out=llp_size_out,
                 q_a=q,
                 q_p=q,
                 q=q,
@@ -175,7 +178,8 @@ try:
                 learning=True,
                 K=learning_rate,
                 seed=0,
-                verbose=True)
+                verbose=True,
+                theta_p=t_delays)
         )
 
         # position and u
@@ -183,27 +187,29 @@ try:
         # position
         nengo.Connection(z, llp.z, synapse=None)
 
-        airsim_display = nengo.Node(airsim_prediction_vis, size_in=3*model.n_pred)
-        display.append(
-                nengo.Node(
-                    size_in=1+model.n_pred,
-                    size_out=1+model.n_pred
-                )
-        )
-        nengo.Connection(z[ll], display[ll][0])
-        nengo.Connection(
-            llp[ll].Z, display[ll][1:],
-            transform=LDN(q=q, theta=np.max(t_delays)).get_weights_for_delays(t_delays/np.max(t_delays)))
-
-        nengo.Connection(display[ll][1:], airsim_display[ll*model.n_pred:(ll+1)*model.n_pred], synapse=None)
+        # airsim_display = nengo.Node(airsim_prediction_vis, size_in=3*model.n_pred)
+        # display.append(
+        #         nengo.Node(
+        #             size_in=1+model.n_pred,
+        #             size_out=1+model.n_pred
+        #         )
+        # )
+        # nengo.Connection(z[ll], display[ll][0])
+        # nengo.Connection(
+        #     llp[ll].Z, display[ll][1:],
+        #     transform=LDN(q=q, theta=np.max(t_delays)).get_weights_for_delays(t_delays/np.max(t_delays)))
+        #
+        # nengo.Connection(display[ll][1:], airsim_display[ll*model.n_pred:(ll+1)*model.n_pred], synapse=None)
 
         # add probes for plotting
-        state_p = nengo.Probe(interface_node, synapse=0)
-        target_p = nengo.Probe(path_node.output, synapse=0)
-        ctrl_p = nengo.Probe(ctrl_node, synapse=0)
-        predx_p = nengo.Probe(display[0], synapse=None)
-        predy_p = nengo.Probe(display[1], synapse=None)
-        predz_p = nengo.Probe(display[2], synapse=None)
+        probes = {}
+        probes['state'] = nengo.Probe(interface_node, synapse=0)
+        probes['target'] = nengo.Probe(path_node.output, synapse=0)
+        probes['ctrl'] = nengo.Probe(ctrl_node, synapse=0)
+        probes['z'] = nengo.Probe(llp.z, synapse=None)
+        probes['zhat'] = nengo.Probe(llp.zhat, synapse=None)
+        probes['Z'] = nengo.Probe(llp.Z, synapse=None)
+
 
     with nengo.Simulator(model, dt=airsim_dt) as sim:
         sim.run(steps * airsim_dt)
@@ -212,6 +218,20 @@ except ExitSim as e:
     print('Exiting Sim')
 
 finally:
+    dat = DataHandler('llp_tests')
+    data = {}
+    for key, val in probes.items():
+        data[key] = sim.data[val]
+    data['time'] = sim.trange()
+    dat.save(data=data, save_location='test_0000', overwrite=True)
+
+    plot_pred(
+        data=data,
+        theta_p=t_delays,
+        size_out=llp_size_out,
+        gif_name='llp_test.gif'
+    )
+
     interface.disconnect()
     # Plot results
     fig = plt.figure()

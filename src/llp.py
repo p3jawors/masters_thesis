@@ -6,6 +6,8 @@ from numpy.polynomial.legendre import Legendre
 import nengo
 import numpy as np
 import matplotlib.pyplot as plt
+import imageio
+import os
 
 blue = '\033[94m'
 green = '\033[92m'
@@ -15,16 +17,13 @@ endc = '\033[0m'
 class LLP(nengo.Network):
     def __init__(
             self, n_neurons=1000, size_in=1, size_out=1, q_a=6, q_p=6, q=6, theta=1.0,
-            dt=0.001, learning=True, decoders=None, K=5e-8, seed=0, verbose=False, output_r=None):
+            dt=0.001, learning=True, decoders=None, K=5e-8, seed=0, verbose=False, theta_p=None):
 
         self.theta = theta
         self.learning = learning
         K = dt*K/n_neurons  #NOTE Terrys implementation had this scaling
         # K = K/n_neurons
         q_r = q
-
-        if output_r is None:
-            output_r = self.theta*np.array([0.25, 0.5, 0.75])
 
         if verbose:
             print(f"{q=}")
@@ -60,9 +59,8 @@ class LLP(nengo.Network):
             self.decoders = decoders
 
         with model:
-            self.input = nengo.Node(size_in=size_in, size_out=size_in, label='input')
+            self.input = nengo.Node(size_in=size_in, size_out=size_in, label='c')
             self.z = nengo.Node(size_in=size_out, size_out=size_out, label='z')
-            # self.gt = nengo.Node(size_in=1, size_out=1, label='gt')
 
             # Our neurons that will predict the future on their output connections
             neurons = nengo.Ensemble(
@@ -74,7 +72,7 @@ class LLP(nengo.Network):
                     label='neurons')
             nengo.Connection(self.input, neurons, synapse=None)
 
-            ldn_a = nengo.Node(LDN(theta=theta, q=q_a, size_in=n_neurons), label='ldn_activities')
+            ldn_a = nengo.Node(LDN(theta=self.theta, q=q_a, size_in=n_neurons), label='ldn_activities')
             nengo.Connection(neurons.neurons, ldn_a, synapse=None)
 
             # Constants of learning rule
@@ -165,7 +163,7 @@ class LLP(nengo.Network):
 
             # store our predictions in an LDN for use in the learning rule
             # this is an ldn storing the values of an ldn
-            ldn_Z = nengo.Node(LDN(theta=theta, q=q_p, size_in=q*size_out), label='ldn_Z')
+            ldn_Z = nengo.Node(LDN(theta=self.theta, q=q_p, size_in=q*size_out), label='ldn_Z')
             nengo.Connection(self.Z, ldn_Z, synapse=None)
 
             # == Input to learning rule ==
@@ -194,14 +192,16 @@ class LLP(nengo.Network):
                 synapse=None)
 
 
-            # prediction_node = nengo.Node(None, size_in=len(output_r) + 1, label='Predictions')
-            #
-            # # TODO generalize the connection sizes, currently assuming dim 0 is the state we are predicting
-            # nengo.Connection(self.z, prediction_node[0])
-            # nengo.Connection(
-            #         Z,
-            #         prediction_node[1:],
-            #         transform=LDN(q=q, theta=self.theta).get_weights_for_delays(output_r))
+            # print('LDN Decode out: ', LDN(theta=self.theta, q=q_p, size_in=1).get_weights_for_delays(np.asarray(theta_p)/self.theta).shape)
+            # print(f'Want to decode {size_out} values')
+            # print(f'Encoding with {q_p} legendre coefficients')
+            # print(f"Shape of Z is {shapes['Z']}")
+            if theta_p is not None:
+                self.zhat = nengo.Node(size_out=size_out*len(theta_p), size_in=size_out*len(theta_p))
+                nengo.Connection(self.Z, self.zhat,
+                    transform=np.tile(
+                        LDN(theta=self.theta, q=q_p, size_in=1).get_weights_for_delays(np.asarray(theta_p)/self.theta), size_out)
+                )
 
 
     # NOTE: credit LLP patent for this function
@@ -249,38 +249,90 @@ class LLP(nengo.Network):
 
 model = nengo.Network()
 with model:
-    theta = 0.5
-    output_r = np.array([0.2, 0.4, 0.6, 0.8, 1.0])
+    freq = 5
+    learning_rate = 5e-5
+    theta_p = np.linspace(0, 0.1, 5)
+    q = 6
+    size_out = 1
+    theta = max(theta_p)
+    dt = 0.001
+
     llp = LLP(
-            n_neurons=1000,
+            n_neurons=2000,
             size_in=2,
-            size_out=1,
-            q_a=6,
-            q_p=6,
-            q=6,
+            size_out=size_out,
+            q_a=q,
+            q_p=q,
+            q=q,
             theta=theta,
-            dt=0.001,
+            dt=dt,
             learning=True,
             decoders=None,
-            K=5e-5,
+            K=learning_rate,
             seed=0,
             verbose=True,
-            output_r=output_r
+            theta_p=theta_p
     )
 
-    f = 5
-    input_node = nengo.Node(
-            lambda t: [np.sin(t*np.pi*2*f), np.cos(t*np.pi*2*f)],
+    context = nengo.Node(
+            lambda t: [np.sin(t*np.pi*2*freq), np.cos(t*np.pi*2*freq)],
             size_in=0, size_out=2)
 
-    # gt_node = nengo.Node(
-    #         lambda t: [np.sin((t+0.25)*np.pi*2*f)],
-    #         size_in=0, size_out=1)
+    nengo.Connection(context, llp.input, synapse=None)
+    nengo.Connection(context[0], llp.z, synapse=None)
 
-    nengo.Connection(input_node, llp.input, synapse=None)
-    nengo.Connection(input_node[0], llp.z, synapse=None)
-    # nengo.Connection(gt_node, llp.gt, synapse=None)
+    z_probe = nengo.Probe(llp.z, synapse=None)
+    zhat_probe = nengo.Probe(llp.zhat, synapse=None)
 
-# sim = nengo.Simulator(model)
-# with sim:
-#     sim.run(0.001)
+
+if __name__ == '__main__':
+    sim = nengo.Simulator(model)
+    with sim:
+        sim.run(10)
+
+    animate = True
+    window = theta*5
+    step = dt*10
+
+    plt.figure()
+    plt.title('Predictions over time')
+    plt.plot(sim.trange(), sim.data[z_probe])
+    plt.plot(sim.trange(), sim.data[zhat_probe])
+    plt.legend(['z'] + [str(tp) for tp in theta_p])
+
+    plt.figure()
+    axs = []
+    for ii in range(0, size_out):
+        axs.append(plt.subplot(ii+1, 1, size_out))
+        axs[ii].plot(sim.trange(), sim.data[zhat_probe])
+
+        plt.gca().set_prop_cycle(None)
+        for pred in theta_p:
+            axs[ii].plot(sim.trange()-pred, sim.data[z_probe].T[ii], linestyle='--')
+
+        axs[ii].legend(
+            ['zhat at: ' + str(round(tp, 3)) for tp in theta_p]
+            + ['z shifted: ' + str(round(tp, 3)) for tp in theta_p],
+            loc=1)
+
+    if animate:
+        start = 0.0
+        stop = window
+        ss = 0
+        filenames = []
+        while stop <= sim.trange()[-1]:
+            for ax in axs:
+                ax.set_xlim(start, stop)
+            filename = f".cache/img_{ss:08d}.jpg"
+            filenames.append(filename)
+            plt.savefig(filename)
+            start += step
+            stop += step
+            ss += 1
+
+        with imageio.get_writer('llp.gif', mode='I') as writer:
+            for filename in filenames:
+                image = imageio.imread(filename)
+                writer.append_data(image)
+                os.remove(filename)
+    plt.show()

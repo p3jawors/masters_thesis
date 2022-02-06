@@ -15,7 +15,7 @@ from abr_control.controllers.path_planners.velocity_profiles import Gaussian
 
 # Test begins here
 airsim_dt = 0.01
-steps = 500
+# steps = 500
 
 # Accepts 12D state as input and outputs a 4D control signal in radians/second
 # in the rotor order: [front_right, rear_left, front_left, rear_right]
@@ -33,27 +33,8 @@ pd_ctrl = PD(
         ]
     )
 )
-def Plinear(t):
-    x = t
-    y = t
-    z = t
-    return np.array([x, y, z])
 
-def Pcurve(t):
-    x = np.sin(t*np.pi/2)
-    # y = np.sin(t*np.pi/2)
-    # z = np.sin(t*np.pi/2)
-
-    # x = t
-    y = t
-    z = t
-    return np.array([x, y, z])
-
-
-# # P = Plinear
-# P = Pcurve
-
-
+# Path planner motion profiles
 Pprof = Linear()
 Vprof = Gaussian(dt=airsim_dt, acceleration=1)
 path = PathPlanner(
@@ -62,11 +43,13 @@ path = PathPlanner(
         verbose=True
     )
 
+# Airsim API
 interface = AirSim(
         dt=airsim_dt,
         show_display=True,
 )
 interface.connect(pause=True)
+
 # get our starting state
 # run twice as sometimes airsim doesn't return the updated state on connect
 feedback = interface.get_feedback()
@@ -80,18 +63,32 @@ state = np.hstack(
             ])
 
 # targets = [np.array([2, 1, -3, 0, 0, 0, 0, 0, 1.57, 0, 0, 0])]
-targets = [
-        np.array([5, 3, -2, 0, 0, 0, 0, 0, 3.14, 0, 0, 0]),
-        # np.array([-5, 3, -2, 0, 0, 0, 0, 0, 1.57, 0, 0, 0]),
-        # np.array([3, -3, -5, 0, 0, 0, 0, 0, 3.14, 0, 0, 0]),
-        # np.array([-1, -2, -2.5, 0, 0, 0, 0, 0, 3.14, 0, 0, 0])
-    ]
+# targets = [
+#         np.array([5, 3, -2, 0, 0, 0, 0, 0, 3.14, 0, 0, 0]),
+#         # np.array([-5, 3, -2, 0, 0, 0, 0, 0, 1.57, 0, 0, 0]),
+#         # np.array([3, -3, -5, 0, 0, 0, 0, 0, 3.14, 0, 0, 0]),
+#         # np.array([-1, -2, -2.5, 0, 0, 0, 0, 0, 3.14, 0, 0, 0])
+#     ]
+
+n_targets = 10
+targets = []
+for ii in range(0, n_targets):
+    target = [
+            np.random.uniform(low=-20, high=20, size=1)[0],
+            np.random.uniform(low=-20, high=20, size=1)[0],
+            np.random.uniform(low=-20, high=-1, size=1)[0],
+            0, 0, 0,
+            0, 0, np.random.uniform(low=-np.pi, high=np.pi, size=1)[0],
+            0, 0, 0]
+
+    targets.append(np.copy(target))
+targets = np.asarray(targets)
+
 interface.set_state("target", targets[0][:3], targets[0][6:9])
 
-freq = 5
 learning_rate = 5e-5
 # t_delays = np.linspace(0, 1.0, 5)
-t_delays = np.array([0.5, 1.0])
+t_delays = np.array([0.25, 0.5])
 q = 6
 
 model = nengo.Network()
@@ -146,64 +143,59 @@ try:
         # connect our controller output to our sim input
         nengo.Connection(ctrl_node, interface_node[:4], synapse=0)
 
-        # def stim_func(t):
-        #     return np.sin(t*2*np.pi*freq), np.cos(t*2*np.pi*freq)
-        # c = nengo.Node(stim_func)
-
-        c = nengo.Node(size_in=6, size_out=6)
+        # xyz u
+        # NOTE might need to add velocity
+        c = nengo.Node(size_in=7, size_out=7)
+        nengo.Connection(interface_node[:3], c, synapse=None, label='xyz>c')
+        nengo.Connection(ctrl_node, c[3:7], synapse=None, label='u>c')
+        # xyz
         z = nengo.Node(size_in=3, size_out=3)
-        nengo.Connection(interface_node[:6], c, synapse=None)
-        nengo.Connection(c[:3], z, synapse=None)
+        nengo.Connection(c[:3], z, synapse=None, label='xyz>z')
 
-        llp = []
-        display = []
-        def airsim_prediction_vis(t, x):
-            xs = x[:model.n_pred]
-            ys = x[model.n_pred: 2*model.n_pred]
-            zs = x[2*model.n_pred:]
-            pred = np.vstack((xs, np.vstack((ys, zs))))
-            for rr, xyz in enumerate(pred.T):
-                interface.set_state(
-                    f"prediction_{rr}",
-                    xyz=xyz,
-                    orientation=[0, 0, 0])
+        # def airsim_prediction_vis(t, x):
+        #     xs = x[:model.n_pred]
+        #     ys = x[model.n_pred: 2*model.n_pred]
+        #     zs = x[2*model.n_pred:]
+        #     pred = np.vstack((xs, np.vstack((ys, zs))))
+        #     for rr, xyz in enumerate(pred.T):
+        #         interface.set_state(
+        #             f"prediction_{rr}",
+        #             xyz=xyz,
+        #             orientation=[0, 0, 0])
+
+        llp = LLP(
+                n_neurons=1000,
+                size_in=7,
+                size_out=3,
+                q_a=q,
+                q_p=q,
+                q=q,
+                theta=np.max(t_delays),
+                dt=airsim_dt,
+                learning=True,
+                K=learning_rate,
+                seed=0,
+                verbose=True)
+        )
+
+        # position and u
+        nengo.Connection(c, llp.input, synapse=None)
+        # position
+        nengo.Connection(z, llp.z, synapse=None)
 
         airsim_display = nengo.Node(airsim_prediction_vis, size_in=3*model.n_pred)
-        for ll, label in enumerate(['x', 'y', 'z']):
-            llp.append(LLP(
-                    n_neurons=1000,
-                    size_in=2,
-                    size_out=1,
-                    q_a=q,
-                    q_p=q,
-                    q=q,
-                    theta=np.max(t_delays),
-                    dt=airsim_dt,
-                    learning=True,
-                    K=learning_rate,
-                    seed=0,
-                    verbose=True)
-                    # output_r=t_delays)
-                    )
+        display.append(
+                nengo.Node(
+                    size_in=1+model.n_pred,
+                    size_out=1+model.n_pred
+                )
+        )
+        nengo.Connection(z[ll], display[ll][0])
+        nengo.Connection(
+            llp[ll].Z, display[ll][1:],
+            transform=LDN(q=q, theta=np.max(t_delays)).get_weights_for_delays(t_delays/np.max(t_delays)))
 
-            # position
-            nengo.Connection(c[ll], llp[ll].input[0], synapse=None)
-            # velocity
-            nengo.Connection(c[ll+3], llp[ll].input[1], synapse=None)
-            nengo.Connection(z[ll], llp[ll].z, synapse=None)
-
-            display.append(
-                    nengo.Node(
-                        size_in=1+model.n_pred,
-                        size_out=1+model.n_pred
-                    )
-            )
-            nengo.Connection(z[ll], display[ll][0])
-            nengo.Connection(
-                llp[ll].Z, display[ll][1:],
-                transform=LDN(q=q, theta=np.max(t_delays)).get_weights_for_delays(t_delays/np.max(t_delays)))
-
-            nengo.Connection(display[ll][1:], airsim_display[ll*model.n_pred:(ll+1)*model.n_pred], synapse=None)
+        nengo.Connection(display[ll][1:], airsim_display[ll*model.n_pred:(ll+1)*model.n_pred], synapse=None)
 
         # add probes for plotting
         state_p = nengo.Probe(interface_node, synapse=0)

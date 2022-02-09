@@ -15,6 +15,7 @@ red = '\033[91m'
 endc = '\033[0m'
 
 class LLP(nengo.Network):
+    # TODO: don't need to pass dt in as parameter
     def __init__(
             self, n_neurons=1000, size_in=1, size_out=1, q_a=6, q_p=6, q=6, theta=1.0,
             dt=0.001, learning=True, decoders=None, K=5e-8, seed=0, verbose=False, theta_p=None):
@@ -45,6 +46,11 @@ class LLP(nengo.Network):
                 'zd': (q_a, q_r, size_out),
                 'D': (n_neurons, q_r, size_out),
         }
+        if verbose:
+            print("---SHAPES---")
+            for key, val in shapes.items():
+                print(f"- {key}: {val}")
+
         sizes = {}
         for key in shapes:
             sizes[key] = np.prod(shapes[key])
@@ -196,12 +202,19 @@ class LLP(nengo.Network):
             # print(f'Want to decode {size_out} values')
             # print(f'Encoding with {q_p} legendre coefficients')
             # print(f"Shape of Z is {shapes['Z']}")
+
+            # transform=np.tile(
+            #     LDN(theta=self.theta, q=q_p, size_in=1).get_weights_for_delays(
+            #         np.asarray(theta_p)/self.theta), size_out)
+            # print(transform.shape)
             if theta_p is not None:
                 self.zhat = nengo.Node(size_out=size_out*len(theta_p), size_in=size_out*len(theta_p))
-                nengo.Connection(self.Z, self.zhat,
-                    transform=np.tile(
-                        LDN(theta=self.theta, q=q_p, size_in=1).get_weights_for_delays(np.asarray(theta_p)/self.theta), size_out)
-                )
+                for ii in range(0, size_out):
+                    nengo.Connection(
+                        self.Z[ii*q_p:(ii+1)*q_p], self.zhat[ii*len(theta_p):(ii+1)*len(theta_p)],
+                        transform=LDN(theta=self.theta, q=q_p, size_in=1).get_weights_for_delays(
+                            np.asarray(theta_p)/self.theta)
+                    )
 
 
     # NOTE: credit LLP patent for this function
@@ -292,7 +305,7 @@ if __name__ == '__main__':
 
     animate = True
     window = theta*5
-    step = dt*100
+    step = dt*10
 
     plt.figure()
     plt.title('Predictions over time')

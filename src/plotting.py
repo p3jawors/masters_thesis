@@ -6,14 +6,21 @@ import numpy as np
 def plot_pred(data, theta_p, size_out, gif_name, animate=True, window=0.5, step=0.1):
     plt.figure()
     plt.title('Predictions over time')
-    plt.plot(data['time'], data['z'])
-    plt.plot(data['time'], data['zhat'])
-    plt.legend(['z'] + [str(tp) for tp in theta_p])
+    plt.plot(data['time'], data['z'], label='z')
+    plt.plot(data['time'], data['zhat'], label='zhat', linestyle='--')
+    plt.legend()
+    # plt.legend(['z'] + [str(tp) for tp in theta_p])
+    # print(data['z'].shape)
+    # print(data['zhat'].shape)
+    # print(data['Z'].shape)
+    # raise Exception
 
     plt.figure()
     axs = []
     for ii in range(0, size_out):
-        axs.append(plt.subplot(ii+1, 1, size_out))
+        # print(f"{ii=}")
+        # print(f"{size_out=}")
+        axs.append(plt.subplot(ii+1, size_out, 1))
         axs[ii].plot(data['time'], data['zhat'])
 
         plt.gca().set_prop_cycle(None)

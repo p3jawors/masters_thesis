@@ -17,7 +17,6 @@ from plotting import plot_pred
 
 # Test begins here
 airsim_dt = 0.01
-# steps = 500
 
 # Accepts 12D state as input and outputs a 4D control signal in radians/second
 # in the rotor order: [front_right, rear_left, front_left, rear_right]
@@ -72,8 +71,9 @@ state = np.hstack(
 #         # np.array([-1, -2, -2.5, 0, 0, 0, 0, 0, 3.14, 0, 0, 0])
 #     ]
 
-n_targets = 10
+n_targets = 100
 targets = []
+# in NED coordinates
 for ii in range(0, n_targets):
     target = [
             np.random.uniform(low=-20, high=20, size=1)[0],
@@ -86,18 +86,21 @@ for ii in range(0, n_targets):
     targets.append(np.copy(target))
 targets = np.asarray(targets)
 
+# set our target object for visualzation purposes only
 interface.set_state("target", targets[0][:3], targets[0][6:9])
 
 learning_rate = 5e-5
 # t_delays = np.linspace(0, 1.0, 5)
-t_delays = np.array([0.25, 0.5])
+# the times in the future we are predicting
+t_delays = np.array([0.25])
+# NOTE can set all q's to be unique, for now setting all to be the same
 q = 6
 
 model = nengo.Network()
 try:
     with model:
-        model.n_pred = len(t_delays)
-        model.config[nengo.Connection].synapse = None
+        # model.n_pred = len(t_delays)
+        # model.config[nengo.Connection].synapse = None
 
         # wrap our interface in a nengo Node
         interface_node = nengo.Node(
@@ -148,7 +151,7 @@ try:
         # xyz u
         # NOTE might need to add velocity
         c = nengo.Node(size_in=7, size_out=7)
-        nengo.Connection(interface_node[:3], c, synapse=None, label='xyz>c')
+        nengo.Connection(interface_node[:3], c[:3], synapse=None, label='xyz>c')
         nengo.Connection(ctrl_node, c[3:7], synapse=None, label='u>c')
         # xyz
         z = nengo.Node(size_in=3, size_out=3)
@@ -179,7 +182,7 @@ try:
                 K=learning_rate,
                 seed=0,
                 verbose=True,
-                theta_p=t_delays)
+                theta_p=t_delays
         )
 
         # position and u
@@ -212,7 +215,8 @@ try:
 
 
     with nengo.Simulator(model, dt=airsim_dt) as sim:
-        sim.run(steps * airsim_dt)
+        # path planner will exit when we reach our final target
+        sim.run(50000 * airsim_dt)
 
 except ExitSim as e:
     print('Exiting Sim')
@@ -223,76 +227,80 @@ finally:
     for key, val in probes.items():
         data[key] = sim.data[val]
     data['time'] = sim.trange()
-    dat.save(data=data, save_location='test_0000', overwrite=True)
+    dat.save(data=data, save_location='100_targets_0000', overwrite=True)
+    # data = dat.load(
+    #         save_location="test_0000",
+    #         parameters=['state', 'target', 'ctrl', 'z', 'zhat', 'Z', 'time']
+    # )
 
-    plot_pred(
-        data=data,
-        theta_p=t_delays,
-        size_out=llp_size_out,
-        gif_name='llp_test.gif'
-    )
+    # plot_pred(
+    #     data=data,
+    #     theta_p=t_delays,
+    #     size_out=llp_size_out,
+    #     gif_name='llp_test.gif'
+    # )
 
     interface.disconnect()
     # Plot results
-    fig = plt.figure()
-    ax = fig.add_subplot(projection='3d')
-    plt.title('Flight Path in NED Coordinates')
-    ax.plot(
-        sim.data[target_p].T[0],
-        sim.data[target_p].T[1],
-        sim.data[target_p].T[2],
-        label='target'
-        )
-    ax.plot(
-        sim.data[state_p].T[0],
-        sim.data[state_p].T[1],
-        sim.data[state_p].T[2],
-        label='state',
-        linestyle='--')
-    ax.scatter(
-        targets[0][0],
-        targets[0][1],
-        targets[0][2],
-        label='final target'
-        )
-    ax.scatter(
-        sim.data[state_p].T[0][0],
-        sim.data[state_p].T[1][0],
-        sim.data[state_p].T[2][0],
-        label='start state',
-        linestyle='--')
-
-    plt.legend()
-
-    plt.figure()
-    plt.title('Control Commands')
-    plt.ylabel('Rotor Velocities [rad/sec]')
-    plt.xlabel('Time [sec]')
-    plt.plot(sim.trange(), sim.data[ctrl_p])
-    plt.legend(["front_right", "rear_left", "front_left", "rear_right"])
-
-    plt.figure()
-    labs = ['current']
-    for delay in t_delays:
-        labs.append(str(delay))
-
-    plt.subplot(311)
-    plt.title('LLP X Predictions')
-    for ss in range(0, model.n_pred+1):
-        plt.plot(sim.trange(), sim.data[predx_p].T[ss], label=labs[ss])
-    plt.legend()
-    plt.subplot(312)
-    plt.title('LLP Y Predictions')
-    for ss in range(0, model.n_pred+1):
-        plt.plot(sim.trange(), sim.data[predy_p].T[ss], label=labs[ss])
-    plt.legend()
-    plt.subplot(313)
-    plt.title('LLP Z Predictions')
-    for ss in range(0, model.n_pred+1):
-        plt.plot(sim.trange(), sim.data[predz_p].T[ss], label=labs[ss])
-    plt.legend()
-
-
-
-    plt.show()
-
+    # fig = plt.figure()
+    # ax = fig.add_subplot(projection='3d')
+    # plt.title('Flight Path in NED Coordinates')
+    # ax.plot(
+    #     sim.data[target_p].T[0],
+    #     sim.data[target_p].T[1],
+    #     sim.data[target_p].T[2],
+    #     label='target'
+    #     )
+    # ax.plot(
+    #     sim.data[state_p].T[0],
+    #     sim.data[state_p].T[1],
+    #     sim.data[state_p].T[2],
+    #     label='state',
+    #     linestyle='--')
+    # ax.scatter(
+    #     targets[0][0],
+    #     targets[0][1],
+    #     targets[0][2],
+    #     label='final target'
+    #     )
+    # ax.scatter(
+    #     sim.data[state_p].T[0][0],
+    #     sim.data[state_p].T[1][0],
+    #     sim.data[state_p].T[2][0],
+    #     label='start state',
+    #     linestyle='--')
+    #
+    # plt.legend()
+    #
+    # plt.figure()
+    # plt.title('Control Commands')
+    # plt.ylabel('Rotor Velocities [rad/sec]')
+    # plt.xlabel('Time [sec]')
+    # plt.plot(sim.trange(), sim.data[ctrl_p])
+    # plt.legend(["front_right", "rear_left", "front_left", "rear_right"])
+    #
+    # plt.figure()
+    # labs = ['current']
+    # for delay in t_delays:
+    #     labs.append(str(delay))
+    #
+    # plt.subplot(311)
+    # plt.title('LLP X Predictions')
+    # for ss in range(0, model.n_pred+1):
+    #     plt.plot(sim.trange(), sim.data[predx_p].T[ss], label=labs[ss])
+    # plt.legend()
+    # plt.subplot(312)
+    # plt.title('LLP Y Predictions')
+    # for ss in range(0, model.n_pred+1):
+    #     plt.plot(sim.trange(), sim.data[predy_p].T[ss], label=labs[ss])
+    # plt.legend()
+    # plt.subplot(313)
+    # plt.title('LLP Z Predictions')
+    # for ss in range(0, model.n_pred+1):
+    #     plt.plot(sim.trange(), sim.data[predz_p].T[ss], label=labs[ss])
+    # plt.legend()
+    #
+    #
+    #
+    # plt.show()
+    #

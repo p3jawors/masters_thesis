@@ -16,15 +16,42 @@ class LLP(nengo.Network):
     """
     Parameters
     ----------
-    q = input
-    q_a = activities
-    q_p = prediction
-    q_r = result, r == q
+    n_neurons: int
+        the number of neurons to predict the legendre coefficients
+    size_in: int
+        the dimensionality of the context signal
+    size_out: int
+        the dimensionality of the context signal to be predicted
+    q: int
+        number of legendre polynomials for the prediction
+    q_a: int
+        number of legendre polynomials for storing neural activity
+    q_p: int
+        number of legendre polynomials for storing our legendre coefficients
+        of our prediction
+    theta: float
+        number of seconds into the future to predict
+    learning: bool
+        toggles learning on and off
+    decoders: float array, Optional (Default: np.zeros)
+        the decoders to scale our activities by to get our q legendre coefficients
+    K: float
+        learning rate
+    verbose:
+        True for status print outs
+    theta_p: list of floats, Optional (Default: None)
+        Times into the future to decode predictions for.
+        When not None, will create nodes for each theta p. Each node will decode
+        the m state at times theta_p from the q legendre coefficients
+    neuron_model: nengo neuron model, Optional (Default: nengo.LIFRate)
+        nengo neuron model to use for prediction
+    **ens_params: dict
+        extra ensemble parameters
     """
 
     def __init__(
             self, n_neurons=1000, size_in=1, size_out=1, q_a=6, q_p=6, q=6, theta=1.0,
-            learning=True, decoders=None, K=5e-8, seed=0, verbose=False, theta_p=None,
+            learning=True, decoders=None, K=5e-8, verbose=False, theta_p=None,
             neuron_model=nengo.LIFRate, **ens_params):
 
         # if neuron_model is None:

@@ -2,24 +2,21 @@ import numpy as np
 from tqdm import tqdm
 from masters_thesis.network.ldn import LDN
 
-def decode_ldn_data(z, Z, t, theta, theta_p=None):
+def decode_ldn_data(Z, q, theta, theta_p=None):
     """
     Parameters
     ----------
-    z: float array (steps, m)
-        state to be predicted
-    Z: float array(steps, m*q_p)
+    Z: float array(steps, m*q)
         prediction of state Z in legendre domain
-    t: float array (steps, )
-        cumulative time of simulation
+    q: int
+        legendre dimensionality
     theta: float
         prediction horizon length [sec]
     theta_p: float array, Optional (Default: None)
         The times to extract from the legendre predictions
         if None, we will output the prediction at theta.
     """
-    m = z.shape[1]
-    q = int(Z.shape[1]/m)
+    m = int(Z.shape[1]/q)
     if theta_p is None:
         theta_p = [theta]
     theta_p = np.asarray(theta_p)
@@ -34,7 +31,7 @@ def decode_ldn_data(z, Z, t, theta, theta_p=None):
     return np.asarray(zhat)
 
 
-def calc_shifted_error(z, zhat, t, theta_p):
+def calc_shifted_error(z, zhat, dt, theta_p):
     """
     Parameters
     ----------
@@ -42,14 +39,12 @@ def calc_shifted_error(z, zhat, t, theta_p):
         state to be predicted
     zhat: float array (steps, len(theta_p), m),)
         predicted state in world space
-    t: float array (steps, )
-        cumulative time of simulation
+    dt: float
+        time step
     theta_p: float array
         the times into the future zhat predictions are in
     """
 
-    dt = np.mean(np.diff(t))
-    # print(f"{dt=}")
     errors = []
     for ii, _theta_p in enumerate(theta_p):
         offset = int(_theta_p/dt)

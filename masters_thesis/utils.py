@@ -16,17 +16,24 @@ def decode_ldn_data(Z, q, theta, theta_p=None):
         The times to extract from the legendre predictions
         if None, we will output the prediction at theta.
     """
+    # print(f"{Z.shape=}")
+    # print(f"{q=}")
+    # print(f"{theta=}")
+    # print(f"{theta_p.shape=}")
     m = int(Z.shape[1]/q)
+    # print(f"{m=}")
     if theta_p is None:
         theta_p = [theta]
     theta_p = np.asarray(theta_p)
 
     # shape (len(theta_p), q)
     transform = LDN(theta=theta, q=q, size_in=1).get_weights_for_delays(theta_p/theta)
+    # print(f"{transform.shape=}")
     zhat = []
     for _Z in tqdm(Z):
         _Z = _Z.reshape((q, m))
         zhat.append(np.dot(transform, _Z))
+        # print(f"{_Z.shape=}")
 
     return np.asarray(zhat)
 
@@ -37,23 +44,48 @@ def calc_shifted_error(z, zhat, dt, theta_p):
     ----------
     z: float array (steps, m)
         state to be predicted
-    zhat: float array (steps, len(theta_p), m),)
+    zhat: float array (steps, len(theta_p), m)
         predicted state in world space
     dt: float
         time step
     theta_p: float array
-        the times into the future zhat predictions are in
+        the times into the future zhat predictions are in [sec]
     """
+    print(f"{z.shape=}")
+    print(f"{zhat.shape=}")
+    steps = z.shape[0]
+    m = z.shape[1]
+    assert z.shape[0] == zhat.shape[0]
+    assert z.shape[1] == zhat.shape[2]
 
-    errors = []
-    for ii, _theta_p in enumerate(theta_p):
-        offset = int(_theta_p/dt)
-        # print(f"{_theta_p=}")
-        # print(f"{offset=}")
-        # print((z[offset:] - zhat[:-offset, ii, :]).shape)
-        error = np.linalg.norm((z[offset:] - zhat[:-offset, ii, :]), axis=1)
-        # print(f"{error.shape=}")
-        errors.append(error)
+    errors = np.empty((steps-int(max(theta_p/dt)), len(theta_p), m))
+    # min_horizon = int(min(theta_p)/dt)
+    # max_horizon = int(max(theta_p)/dt) + 1 #  to include this value due to np indexing being [start, end)
+    for dim in range(0, m):
+        for step in range(0, steps-int(max(theta_p/dt))): #  can't get ground truth at time n so remove the last max theta_p steps
+            for tp, _theta_p in enumerate(theta_p):
+                # theta_steps = int(_theta_p/dt)
+                # print(f"{_theta_p=}")
+                # print(f"{theta_steps}")
+                # print(z[step:step+theta_steps, dim].shape)
+                # print(zhat[step, :, dim].shape)
+                # print(f"{step=}+{int(min(theta_p)/dt)=}")
+                # print(f"{int(max(theta_p)/dt)=}")
+                # step_error = np.linalg.norm((np.squeeze(z[step+int(min(theta_p)/dt):step+1+int(max(theta_p)/dt), dim]) - np.squeeze(zhat[step, :, dim])))
+                diff = z[step + int(_theta_p/dt), dim] - zhat[step, tp, dim]
+                errors[step, tp, dim] = diff
+
+    # for ii, _theta_p in enumerate(theta_p):
+    #     offset = int(_theta_p/dt)
+    #     # print(f"{_theta_p=}")
+    #     # print(f"{offset=}")
+    #     # print(f"{z.shape=}")
+    #     # print(f"{z[offset:].shape=}")
+    #     # print(f"{zhat.shape=}")
+    #     # print(f"{zhat[:-offset, ii, :].shape=}")
+    #     error = np.linalg.norm((z[offset:] - zhat[:-offset, ii, :]), axis=1)
+    #     # print(f"{error.shape=}")
+    #     errors.append(error)
     return np.asarray(errors)
 
 # def old_func():

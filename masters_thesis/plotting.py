@@ -3,10 +3,12 @@ import imageio
 import os
 import numpy as np
 
-def plot_pred(time, z, zhat, theta_p, size_out, gif_name, animate=True, window=0.5, step=0.1):
+def plot_pred(
+        time, z, zhat, theta_p, size_out, gif_name, animate=True, window=0.5,
+        step=0.1):
     plt.figure()
-    print(z.shape)
-    print(zhat.shape)
+    # print(z.shape)
+    # print(zhat.shape)
     for tt, _theta_p in enumerate(theta_p):
         plt.subplot(len(theta_p), 1, tt+1)
         plt.title(f"{_theta_p} prediction")

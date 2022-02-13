@@ -9,6 +9,8 @@ def run_model(dt, n_neurons, size_in, q, q_a, q_p, theta, learning_rate, seed, c
     model = nengo.Network()
     with model:
         n_pts = len(data['state'])
+        print(f"{n_pts=}")
+        print(f"{data['state'].shape}")
 
         llp = LLP(
                 n_neurons=n_neurons,
@@ -38,7 +40,7 @@ def run_model(dt, n_neurons, size_in, q, q_a, q_p, theta, learning_rate, seed, c
 
         Z_probe = nengo.Probe(llp.Z, synapse=None)
 
-    sim = nengo.Simulator(model)
+    sim = nengo.Simulator(model, dt=dt)
     with sim:
         sim.run(dt*n_pts)
 

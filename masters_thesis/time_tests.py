@@ -127,8 +127,8 @@ if __name__ == '__main__':
     params = {}
     params['dt'] = 0.01
     params['steps_in_sim'] = 1
-    params['steps_to_predict'] = 100
+    params['steps_to_predict'] = np.arange(10, 500) #100
     params['m'] = 3
-    params['q'] = np.arange(1, 12, 1)
+    params['q'] = 6 #np.arange(1, 12, 1)
 
     decode_times, error_times = gen_timing_plots(params=params)

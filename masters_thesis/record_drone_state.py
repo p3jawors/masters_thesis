@@ -17,6 +17,7 @@ else:
 print(f"Collecting data for {n_targets} target reach")
 
 airsim_dt = 0.01
+save_location = '100_linear_targets'
 
 # Accepts 12D state as input and outputs a 4D control signal in radians/second
 # in the rotor order: [front_right, rear_left, front_left, rear_right]
@@ -67,9 +68,9 @@ targets = []
 # in NED coordinates
 for ii in range(0, n_targets):
     target = [
-            np.random.uniform(low=-20, high=20, size=1)[0],
-            np.random.uniform(low=-20, high=20, size=1)[0],
-            np.random.uniform(low=-20, high=-1, size=1)[0],
+            np.random.uniform(low=-15, high=15, size=1)[0],
+            np.random.uniform(low=-15, high=15, size=1)[0],
+            np.random.uniform(low=-15, high=-1, size=1)[0],
             0, 0, 0,
             0, 0, np.random.uniform(low=-np.pi, high=np.pi, size=1)[0],
             0, 0, 0]
@@ -96,7 +97,7 @@ try:
                 dt=airsim_dt,
                 buffer_reach_time=0,
                 use_start_location=True,
-                max_velocity=2,
+                max_velocity=4,
                 start_velocity=0,
                 target_velocity=0
         )
@@ -148,5 +149,5 @@ finally:
     for key, val in probes.items():
         data[key] = sim.data[val]
     data['time'] = sim.trange()
-    dat.save(data=data, save_location='100_targets_0000', overwrite=True)
+    dat.save(data=data, save_location=save_location, overwrite=True)
     interface.disconnect()

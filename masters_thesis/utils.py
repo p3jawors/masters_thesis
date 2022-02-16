@@ -2,6 +2,13 @@ import numpy as np
 from tqdm import tqdm
 from masters_thesis.network.ldn import LDN
 
+def calc_ldn_repr_err(z, qrange, theta, theta_p):
+    """
+    Shows error of representation of decoded LDN at theta_p values, vary
+    q used in LDN representation.
+    """
+    raise NotImplementedError
+
 def decode_ldn_data(Z, q, theta, theta_p=None):
     """
     Parameters
@@ -40,6 +47,9 @@ def decode_ldn_data(Z, q, theta, theta_p=None):
 
 def calc_shifted_error(z, zhat, dt, theta_p):
     """
+    Returns the difference between zhat and z shifted by the
+    corresponding theta_p. Error is return in the same shape as
+    zhat (steps, len(theta_p), m)
     Parameters
     ----------
     z: float array (steps, m)
@@ -51,8 +61,8 @@ def calc_shifted_error(z, zhat, dt, theta_p):
     theta_p: float array
         the times into the future zhat predictions are in [sec]
     """
-    print(f"{z.shape=}")
-    print(f"{zhat.shape=}")
+    # print(f"{z.shape=}")
+    # print(f"{zhat.shape=}")
     steps = z.shape[0]
     m = z.shape[1]
     assert z.shape[0] == zhat.shape[0]

@@ -1,4 +1,5 @@
 import numpy as np
+import os
 import nengo
 import nni
 import sys
@@ -24,7 +25,8 @@ if len(sys.argv) > 1:
 # Load training data
 db_name = 'llp_pd'
 train_data = '100_linear_targets' #  90820 temporal data points
-dat = DataHandler(db_name)
+# print(f"Current dir: {os.getcwd()}")
+dat = DataHandler(db_name, database_dir='../data/databases') #  since nni is run from nni_scripts folder, go back a dir
 data = dat.load(
     save_location=train_data,
     parameters=['time', 'state', 'ctrl']
@@ -56,34 +58,34 @@ else:
 size_in = len(params['context_dims']) + 4
 
 # NOTE scaling learning rate by dt here, and llp class scales by 1/n_neurons
-# save_data = run_model(
-#     dt=dt,
-#     n_neurons=n_neurons,
-#     size_in=size_in,
-#     q=params['q'],
-#     q_a=params['q_a'],
-#     q_p=params['q_p'],
-#     theta=theta,
-#     learning_rate=params['learning_rate']*dt,
-#     seed=seed,
-#     context_dims=params['context_dims'],
-#     data=data
-# )
-#
-# if not run_nni:
-#     # no need to save nni data
-#     save_data['train_data'] = train_data
-#     dat.save(
-#         save_location=experiment_id,
-#         data=save_data,
-#         overwrite=True
-#     )
+save_data = run_model(
+    dt=dt,
+    n_neurons=n_neurons,
+    size_in=size_in,
+    q=params['q'],
+    q_a=params['q_a'],
+    q_p=params['q_p'],
+    theta=theta,
+    learning_rate=params['learning_rate']*dt,
+    seed=seed,
+    context_dims=params['context_dims'],
+    data=data
+)
+
+if not run_nni:
+    # no need to save nni data
+    save_data['train_data'] = train_data
+    dat.save(
+        save_location=experiment_id,
+        data=save_data,
+        overwrite=True
+    )
 
 # TODO coment when training to view live results
-save_data = dat.load(
-    save_location=experiment_id,
-    parameters=['Z']
-)
+# save_data = dat.load(
+#     save_location=experiment_id,
+#     parameters=['Z']
+# )
 
 zhat = decode_ldn_data(
     Z=save_data['Z'],
@@ -98,9 +100,12 @@ errors = calc_shifted_error(
     theta_p=theta_p
 )
 print('ERRORS: ', errors.shape)
+errors = np.absolute(errors)
+error = sum(sum(sum(errors)))
+print('final error: ', error)
 
 if run_nni:
-    nni.report_final_result(sum(errors))
+    nni.report_final_result(error)
 else:
     plot_error(theta_p=theta_p, errors=errors)
 

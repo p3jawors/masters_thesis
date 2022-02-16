@@ -8,6 +8,12 @@ import os
 from plotting import plot_pred, plot_error
 from train import run_model
 
+if len(sys.argv) > 1:
+    # pass in False to just reload the test results
+    rerun = eval(sys.argv[1])
+else:
+    rerun = True
+
 experiment_id = 'train/param_set_0000'
 dt = 0.01
 n_neurons = 2000
@@ -36,42 +42,43 @@ print("Running with default parameters")
 params = {}
 # x, y, z, dx, dy, dz, a, b, g, da, db, dg
 # run_model appends ctrl to the context dims as input
-params['context_dims'] = (0, 1, 2, 6, 7, 8) # xyz
-params['q_a'] = 10
-params['q_p'] = 7
-params['q'] = 7
-params['learning_rate'] = 0.000012834580078171056
+params['context_dims'] = (0, 1, 2)#, 6, 7, 8) # xyz
+params['q_a'] = 7
+params['q_p'] = 8
+params['q'] = 8
+params['learning_rate'] = 0.000012855359083673843
 
 size_in = len(params['context_dims']) + 4
 
 # NOTE scaling learning rate by dt here, and llp class scales by 1/n_neurons
-# save_data = run_model(
-#     dt=dt,
-#     n_neurons=n_neurons,
-#     size_in=size_in,
-#     q=params['q'],
-#     q_a=params['q_a'],
-#     q_p=params['q_p'],
-#     theta=theta,
-#     learning_rate=params['learning_rate']*dt,
-#     seed=seed,
-#     context_dims=params['context_dims'],
-#     data=data
-# )
-#
-# # no need to save nni data
-# save_data['train_data'] = train_data
-# dat.save(
-#     save_location=experiment_id,
-#     data=save_data,
-#     overwrite=True
-# )
+if rerun:
+    save_data = run_model(
+        dt=dt,
+        n_neurons=n_neurons,
+        size_in=size_in,
+        q=params['q'],
+        q_a=params['q_a'],
+        q_p=params['q_p'],
+        theta=theta,
+        learning_rate=params['learning_rate']*dt,
+        seed=seed,
+        context_dims=params['context_dims'],
+        data=data
+    )
 
-# TODO coment when training to view live results
-save_data = dat.load(
-    save_location=experiment_id,
-    parameters=['Z']
-)
+    # no need to save nni data
+    save_data['train_data'] = train_data
+    dat.save(
+        save_location=experiment_id,
+        data=save_data,
+        overwrite=True
+    )
+
+else:
+    save_data = dat.load(
+        save_location=experiment_id,
+        parameters=['Z']
+    )
 
 zhat = decode_ldn_data(
     Z=save_data['Z'],
@@ -90,12 +97,12 @@ print('ERRORS: ', errors.shape)
 
 plot_error(theta_p=theta_p, errors=errors, dt=dt)
 
-# plot_pred(
-#     time=data['time'],
-#     z=data['state'][:, :3],
-#     zhat=zhat[:, -1, :],
-#     theta_p=[max(theta_p)],
-#     size_out=3,
-#     gif_name='llp_default.gif',
-#     animate=True
-# )
+plot_pred(
+    time=data['time'],
+    z=data['state'][:, :3],
+    zhat=zhat[:, -1, :],
+    theta_p=[max(theta_p)],
+    size_out=3,
+    gif_name=f"{experiment_id.split('/')[-1]}.gif",
+    animate=True
+)

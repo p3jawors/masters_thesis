@@ -142,6 +142,27 @@ def plot_error(theta_p, errors, dt, output_labs=('X', 'Y', 'Z')):
             plt.xlabel('Time [sec]')
             plt.ylabel(f'2norm Error of Mean Over Theta_P')
             axs[ii].plot(time, np.linalg.norm(np.mean(errors, axis=1), axis=1))
+
+    # Plot avg error over time, showing each theta_p line
+    plt.figure(figsize=(8,12))
+    axs = []
+    for ii in range(0, errors.shape[2]+1):
+        axs.append(plt.subplot(errors.shape[2]+1, 1, ii+1))
+        for tp, _theta_p in enumerate(theta_p):
+            alpha = 1 - tp/len(theta_p)
+            if ii < errors.shape[2]:
+                plt.title("Error over Time, Varying Theta_p")
+                plt.xlabel('Time [sec]')
+                plt.ylabel(f'{output_labs[ii]} Mean Error Over Theta_P')
+                axs[ii].plot(time, errors[:, tp, ii], alpha=alpha, label=f"{_theta_p}")#, c='r')
+            else:
+                plt.title("Error over Time")
+                plt.xlabel('Time [sec]')
+                plt.ylabel(f'2norm Error of Mean Over Theta_P')
+                # axs[ii].plot(time, np.linalg.norm(np.mean(errors, axis=1), axis=1))
+                axs[ii].plot(time, np.linalg.norm(errors[:, tp, :], axis=1), alpha=alpha, label=f"{_theta_p}")#, c='r')
+        # plt.legend()
+
     # plt.show()
 
     # Plot avg error over theta_p, averaging over time
@@ -153,8 +174,5 @@ def plot_error(theta_p, errors, dt, output_labs=('X', 'Y', 'Z')):
         plt.xlabel('Theta_P [sec]')
         plt.ylabel(f'{output_labs[ii]} Mean Error Over Time')
         axs[ii].plot(theta_p, np.mean(errors[:, :, ii], axis=0))
+
     plt.show()
-
-
-
-

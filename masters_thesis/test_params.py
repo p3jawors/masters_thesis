@@ -32,7 +32,7 @@ data = dat.load(
     save_location=train_data,
     parameters=['time', 'state', 'ctrl']
 )
-n_data_pts = 10000
+n_data_pts = 50000
 data['time'] = data['time'][:n_data_pts]
 data['state'] = data['state'][:n_data_pts]
 data['ctrl'] = data['ctrl'][:n_data_pts]
@@ -104,5 +104,5 @@ plot_pred(
     theta_p=[max(theta_p)],
     size_out=3,
     gif_name=f"{experiment_id.split('/')[-1]}.gif",
-    animate=True
+    animate=False
 )

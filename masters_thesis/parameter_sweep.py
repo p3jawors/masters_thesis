@@ -18,9 +18,12 @@ print(len(theta_p))
 seed = 47
 
 run_nni = False
+n_data_pts = 10000
 if len(sys.argv) > 1:
     if 'nni' in sys.argv[1]:
         run_nni = True
+    if len(sys.argv) > 2:
+        n_data_pts = int(sys.argv[2])
 
 # Load training data
 db_name = 'llp_pd'
@@ -31,7 +34,6 @@ data = dat.load(
     save_location=train_data,
     parameters=['time', 'state', 'ctrl']
 )
-n_data_pts = 10000
 data['time'] = data['time'][:n_data_pts]
 data['state'] = data['state'][:n_data_pts]
 data['ctrl'] = data['ctrl'][:n_data_pts]

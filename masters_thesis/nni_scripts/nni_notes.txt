@@ -1,0 +1,61 @@
+-------------------------------------------------
+opE135c4
+- 10k steps of training
+- 2k neurons
+- theta = 1
+- theta_p = np.linspace(dt, theta, int(theta/dt))
+{
+  "context_dims": {"_type": "choice", "_value": [[0, 1, 2], [0, 1, 2, 8], [0, 1, 2, 3, 4, 5], [0, 1, 2, 3, 4, 5, 8], [0, 1, 2, 3, 4, 5, 8, 11], [6, 7, 8], [6, 7, 8, 9, 10, 11], [0, 1, 2, 6, 7, 8], [0, 1, 2, 3, 4, 5, 6, 7, 8], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]]},
+  "q_a": {"_type": "choice", "_value": [6, 7, 8, 9, 10, 11, 12]},
+  "q_p": {"_type": "choice", "_value": [6, 7, 8, 9, 10, 11, 12]},
+  "q": {"_type": "choice", "_value": [6, 7, 8, 9, 10, 11, 12]},
+  "learning_rate": {"_type": "uniform", "_value": [0.000001, 0.0001]}
+}
+
+-------------------------------------------------
+MwqYn5ZW
+- 30k steps
+- 2k neurons
+- theta = 1
+- theta_p = np.linspace(dt, theta, int(theta/dt))
+{
+  "context_dims": {"_type": "choice", "_value": [[0, 1, 2], [0, 1, 2, 8], [0, 1, 2, 3, 4, 5], [0, 1, 2, 3, 4, 5, 8], [0, 1, 2, 3, 4, 5, 8, 11], [6, 7, 8], [6, 7, 8, 9, 10, 11], [0, 1, 2, 6, 7, 8], [0, 1, 2, 3, 4, 5, 6, 7, 8], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]]},
+  "q_a": {"_type": "choice", "_value": [6, 7, 8, 9, 10, 11, 12]},
+  "q_p": {"_type": "choice", "_value": [6, 7, 8, 9, 10, 11, 12]},
+  "q": {"_type": "choice", "_value": [6, 7, 8, 9, 10, 11, 12]},
+  "learning_rate": {"_type": "uniform", "_value": [0.000001, 0.0001]}
+}
+
+-------------------------------------------------
+8dgxeGm4
+- 30k steps
+- searching n_neurons
+- larger range for q's
+- theta = 1
+- theta_p = np.linspace(dt, theta, int(theta/dt))
+{
+  "context_dims": {"_type": "choice", "_value": [[0, 1, 2], [0, 1, 2, 8], [0, 1, 2, 3, 4, 5], [0, 1, 2, 3, 4, 5, 8], [0, 1, 2, 3, 4, 5, 8, 11], [6, 7, 8], [6, 7, 8, 9, 10, 11], [0, 1, 2, 6, 7, 8], [0, 1, 2, 3, 4, 5, 6, 7, 8], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]]},
+  "n_neurons": {"_type": "choice", "_value": [1000, 2000, 3000, 4000]},
+  "q_a": {"_type": "choice", "_value": [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]},
+  "q_p": {"_type": "choice", "_value": [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]},
+  "q": {"_type": "choice", "_value": [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]},
+  "learning_rate": {"_type": "uniform", "_value": [0.000001, 0.0001]}
+}
+
+-------------------------------------------------
+vNFqMXPZ
+- 30k steps
+- n_neurons set to 2k
+- larger range for q's again
+- theta = 1
+- theta_p = np.linspace(dt, theta, int(theta/dt))
+- using error states now
+- ctrl now has gravity offset removed, clipped at 250, and normalized
+- quick tests look promising
+{
+  "c_dims": {"_type": "choice", "_value": [[12, 13, 14], [12, 13, 14, 20], [12, 13, 14, 15, 16, 17], [12, 13, 14, 15, 16, 17, 20]]},
+  "q_a": {"_type": "choice", "_value": [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]},
+  "q_p": {"_type": "choice", "_value": [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]},
+  "q": {"_type": "choice", "_value": [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]},
+  "learning_rate": {"_type": "uniform", "_value": [0.000001, 0.001]}
+}

@@ -2,7 +2,9 @@ import numpy as np
 import nengo
 from network import LLP
 
-def run_model(dt, n_neurons, size_in, q, q_a, q_p, theta, learning_rate, seed, context_dims, data, size_out=3):
+def run_model(
+    dt, n_neurons, size_in, q, q_a, q_p, theta, learning_rate,
+    seed, c_dims, z_dims, data, radius):
     """
     data needs to have keys for: state, ctrl
     """
@@ -15,7 +17,7 @@ def run_model(dt, n_neurons, size_in, q, q_a, q_p, theta, learning_rate, seed, c
         llp = LLP(
                 n_neurons=n_neurons,
                 size_in=size_in,
-                size_out=3, #  predict xyz
+                size_out=len(z_dims), #  predict xyz
                 q_a=q_a,
                 q_p=q_p,
                 q=q,
@@ -23,20 +25,31 @@ def run_model(dt, n_neurons, size_in, q, q_a, q_p, theta, learning_rate, seed, c
                 learning=True,
                 K=learning_rate,
                 seed=seed,
+                radius=radius
         )
 
         def input_func(t):
             index = int((t-dt)/dt)
-            state = np.take(data['state'][index], context_dims)
-            u = data['ctrl'][index]
+            state = np.take(data['state_and_error'][index], c_dims)
+            # u = data['ctrl'][index]
+            u = data['clean_u'][index]
             c = np.hstack((state, u)).tolist()
             return c
 
         input_node = nengo.Node(
-            input_func, size_out=size_in, label='input')
+            input_func, size_out=size_in, label='c node')
 
         nengo.Connection(input_node, llp.c, synapse=None)
-        nengo.Connection(input_node[:3], llp.z, synapse=None)
+
+        def z_func(t):
+            index = int((t-dt)/dt)
+            z = np.take(data['state_and_error'][index], z_dims)
+            return z
+
+        z_node = nengo.Node(
+            z_func, size_out=len(z_dims), label='z_node')
+
+        nengo.Connection(z_node, llp.z, synapse=None)
 
         Z_probe = nengo.Probe(llp.Z, synapse=None)
 
@@ -54,6 +67,7 @@ def run_model(dt, n_neurons, size_in, q, q_a, q_p, theta, learning_rate, seed, c
     save_data['theta'] = theta
     save_data['learning_rate'] = learning_rate
     save_data['seed'] = seed
-    save_data['context_dims'] = context_dims
+    save_data['c_dims'] = c_dims
+    save_data['z_dims'] = z_dims
 
     return save_data

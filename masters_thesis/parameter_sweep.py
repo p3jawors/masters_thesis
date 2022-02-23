@@ -10,7 +10,6 @@ from plotting import plot_pred, plot_error
 from train import run_model
 
 dt = 0.01
-n_neurons = 2000
 theta = 1.0
 theta_p = np.linspace(dt, theta, int(theta/dt))
 print(theta_p)
@@ -32,11 +31,13 @@ train_data = '100_linear_targets' #  90820 temporal data points
 dat = DataHandler(db_name, database_dir='../data/databases') #  since nni is run from nni_scripts folder, go back a dir
 data = dat.load(
     save_location=train_data,
-    parameters=['time', 'state', 'ctrl']
+    parameters=['time', 'state', 'ctrl', 'state_and_error', 'clean_u']
 )
 data['time'] = data['time'][:n_data_pts]
 data['state'] = data['state'][:n_data_pts]
 data['ctrl'] = data['ctrl'][:n_data_pts]
+data['state_and_error'] = data['state_and_error'][:n_data_pts]
+data['clean_u'] = data['clean_u'][:n_data_pts]
 
 if run_nni:
     # Load nni params
@@ -51,18 +52,21 @@ else:
     params = {}
     # x, y, z, dx, dy, dz, a, b, g, da, db, dg
     # run_model appends ctrl to the context dims as input
-    params['context_dims'] = (0, 1, 2, 3, 4, 5) # xyz
-    params['q_a'] = 6
-    params['q_p'] = 6
-    params['q'] = 6
-    params['learning_rate'] = 5e-5
+    # params['c_dims'] = (0, 1, 2, 8)#, 3, 4, 5) # xyz
+    params['c_dims'] = (12, 13, 14, 20)#, 3, 4, 5) # xyz
+    params['q_a'] = 10
+    params['q_p'] = 8
+    params['q'] = 8
+    params['learning_rate'] = 0.000012860959190751539
+    # params['n_neurons'] = 2000
 
-size_in = len(params['context_dims']) + 4
+size_in = len(params['c_dims']) + 4
+params['z_dims'] = (12, 13, 14)
 
 # NOTE scaling learning rate by dt here, and llp class scales by 1/n_neurons
 save_data = run_model(
     dt=dt,
-    n_neurons=n_neurons,
+    n_neurons=2000,#params['n_neurons'],
     size_in=size_in,
     q=params['q'],
     q_a=params['q_a'],
@@ -70,8 +74,10 @@ save_data = run_model(
     theta=theta,
     learning_rate=params['learning_rate']*dt,
     seed=seed,
-    context_dims=params['context_dims'],
-    data=data
+    c_dims=params['c_dims'],
+    z_dims=params['z_dims'],
+    data=data,
+    radius=np.sqrt(len(params['c_dims']))
 )
 
 if not run_nni:
@@ -95,8 +101,10 @@ zhat = decode_ldn_data(
     theta=theta,
     theta_p=theta_p
 )
+print("\nTODOOO!!!! \n\n NEED TO REMOVE HARDCODING FOR ERROR CALC DIMS\n\n")
 errors = calc_shifted_error(
-    z=data['state'][:, :3], #  xyz
+    # z=data['state'][:, :3], #  xyz
+    z=data['state_and_error'][:, 12:15], #  xyz
     zhat=zhat,
     dt=dt,
     theta_p=theta_p

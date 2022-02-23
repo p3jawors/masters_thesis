@@ -2,6 +2,7 @@ import numpy as np
 import nengo
 from tqdm import tqdm
 from masters_thesis.network.ldn import LDN
+import matplotlib.pyplot as plt
 
 def calc_ldn_repr_err(z, qvals, theta, theta_p, dt=0.01):
     """
@@ -128,3 +129,49 @@ def calc_shifted_error(z, zhat, dt, theta_p, model='llp'):
                 errors[step, tp_index, dim] = diff
 
     return np.asarray(errors)
+
+def get_mean_and_range(data):
+    print(f"{data.shape=}")
+    plt.figure(figsize=(12,18))
+    means = []
+    stds = []
+    ranges = []
+    for ii in range(0, data.shape[0]):
+        print(ii)
+        lab = f"q{ii}"
+        _t = np.arange(0, len(data[ii]))*0.001
+        _mean = np.mean(data[ii])
+        means.append(_mean)
+        _variance = np.var(data[ii])
+        _std = np.std(data[ii])
+        stds.append(_std)
+        _range = max(max(data[ii])-_mean, abs(min(data[ii])-_mean))
+        ranges.append(_range)
+        # print(f'{_mean=}')
+        # print(f'{_variance=}')
+        # print(f'{_range=}')
+        # print(f'{_std=}')
+        # print(f'{_std**2=}')
+        plt.subplot(data.shape[0],1,ii+1)
+        plt.title(lab)
+        plt.plot(_t, data[ii])
+        plt.hlines(_mean, _t[0], _t[-1], label='mean', color='r', linestyle='--')
+        plt.fill_between(_t, _std+_mean, _mean-_std, alpha=0.5, label='1 std=68.2%', color='tab:purple')
+        plt.fill_between(_t, 2*_std+_mean, _mean-2*_std, alpha=0.3, label='2 std=95.4%', color='tab:purple')
+        plt.fill_between(_t, 3*_std+_mean, _mean-3*_std, alpha=0.1, label='3 std=99.8%', color='tab:purple')
+        plt.hlines(_mean+_variance, _t[0], _t[-1], label='+variance', color='y', linestyle='--')
+        plt.hlines(_mean-_variance, _t[0], _t[-1], label='-variance', color='y', linestyle='--')
+        plt.hlines(_range, _t[0], _t[-1], label='+range', color='g', linestyle='--')
+        plt.hlines(-_range, _t[0], _t[-1], label='-range',  color='g', linestyle='--')
+        plt.legend(loc=1)
+
+    print(f"{means=}")
+    print(f"{stds=}")
+    print(f"{2*stds=}")
+    print(f"{3*stds=}")
+    # np.savetxt('data/dq_mean.txt', means)
+    # np.savetxt('data/dq_1std.txt', stds)
+    # np.savetxt('data/dq_2std.txt', 2*np.array(stds))
+    # np.savetxt('data/dq_3std.txt', 3*np.array(stds))
+    # np.savetxt('data/dq_range.txt', 3*np.array(ranges))
+    plt.show()

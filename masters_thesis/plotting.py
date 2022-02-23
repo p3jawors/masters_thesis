@@ -74,16 +74,21 @@ def plot_pred(
                 os.remove(filename)
     plt.show()
 
-def plot_error(theta_p, errors, dt, output_labs=('X', 'Y', 'Z')):
+def plot_error(theta_p, errors, dt, output_labs=('X', 'Y', 'Z'), theta=None):
     """
     Parameters
     ----------
+    theta: float Optional (Default: max(theta_p))
+        size of window we are predicted
     theta_p: float array
         the times into the future zhat predictions are in [sec]
     errors: float array
         the errors returns from utils.calc_shifted_error (steps, len(theta_p), m),
         where m is the number of output dims
     """
+    if theta is None:
+        theta = max(theta_p)
+
     if len(theta_p) < 10:
         plt.figure(figsize=(8,8))
         for ii in range(0, len(theta_p)):
@@ -113,13 +118,21 @@ def plot_error(theta_p, errors, dt, output_labs=('X', 'Y', 'Z')):
     # Plot a 2d heat map of the above
     fig = plt.figure()
     axs = []
-    for ii in range(0, errors.shape[2]):
-        axs.append(plt.subplot(errors.shape[2], 1, ii+1))
-        plt.xlabel('Time [sec]')
-        plt.ylabel('Theta P [sec]')
-        plt.title(f'{output_labs[ii]} Error')
-        X, Y = np.meshgrid(time, theta_p)
-        axs[ii].pcolormesh(X, Y, errors[:, :, ii].T)
+    for ii in range(0, errors.shape[2]+1):
+        axs.append(plt.subplot(errors.shape[2]+1, 1, ii+1))
+        if ii < errors.shape[2]:
+            plt.xlabel('Time [sec]')
+            plt.ylabel('Theta P [sec]')
+            plt.title(f'{output_labs[ii]} Error | theta={theta}')
+            X, Y = np.meshgrid(time, theta_p)
+            axs[ii].pcolormesh(X, Y, errors[:, :, ii].T)
+        else:
+            plt.xlabel('Time [sec]')
+            plt.ylabel('Theta P [sec]')
+            plt.title(f'2norm Error | theta={theta}')
+            X, Y = np.meshgrid(time, theta_p)
+            axs[ii].pcolormesh(X, Y, np.linalg.norm(errors, axis=2).T)
+
         # surf = axs[ii].plot_surface(X, Y, errors[:, :, ii].T,
         #         cmap=cm.coolwarm, linewidth=0, antialiased=False)
         # axs[ii].zaxis.set_major_locator(LinearLocator(10))

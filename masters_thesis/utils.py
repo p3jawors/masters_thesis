@@ -1,10 +1,13 @@
+# import matplotlib
+# matplotlib.use('TkAgg')
+
 import numpy as np
 import nengo
 from tqdm import tqdm
 from masters_thesis.network.ldn import LDN
 import matplotlib.pyplot as plt
 
-def calc_ldn_repr_err(z, qvals, theta, theta_p, dt=0.01):
+def calc_ldn_repr_err(z, qvals, theta, theta_p, dt=0.01, return_zhat=False):
     """
     Shows error of representation of decoded LDN at theta_p values, vary
     q used in LDN representation.
@@ -15,8 +18,12 @@ def calc_ldn_repr_err(z, qvals, theta, theta_p, dt=0.01):
         state to be predicted
 
     """
-    results = []
+    results = {}
+    if return_zhat:
+        zhats = {}
+
     for q in qvals:
+        print(f"encoding ldn with {q=}")
         model = nengo.Network()
         with model:
             ldn = nengo.Node(LDN(theta=theta, q=q, size_in=z.shape[1]), label='ldn')
@@ -47,9 +54,18 @@ def calc_ldn_repr_err(z, qvals, theta, theta_p, dt=0.01):
             model='ldn'
         )
 
-        results.append(sum(sum(errors)))
+        print(f"{q=} error shape: {np.asarray(errors).shape}")
+        # results.append(sum(sum(errors)))
+        results[f"{q}"] = errors
 
-    return results
+        if return_zhat:
+            zhats[f"{q}"] = zhat
+
+    # return np.asarray(results)
+    if return_zhat:
+        return results, zhats
+    else:
+        return results
 
 
 def decode_ldn_data(Z, q, theta, theta_p=None):
@@ -109,24 +125,33 @@ def calc_shifted_error(z, zhat, dt, theta_p, model='llp'):
         'ldn' to get shifted error for ldn. In this case we shift our
         ground truth backward in time
     """
-    print(z.shape)
-    print(zhat.shape)
+    print('calc shifted error')
+    print('z shape: ', z.shape)
+    print('zhat shape: ', zhat.shape)
     steps = z.shape[0]
     m = z.shape[1]
     assert z.shape[0] == zhat.shape[0]
     assert z.shape[1] == zhat.shape[2]
 
-    errors = np.empty((steps-int(max(theta_p)/dt), len(theta_p), m))
+    # errors = np.empty((steps-int(max(theta_p)/dt), len(theta_p), m))
+    errors = np.zeros((steps, len(theta_p), m))
     for dim in range(0, m):
-        for step in range(0, steps-int(max(theta_p)/dt)): #  can't get ground truth at time n so remove the last max theta_p steps
-            for tp_index, _theta_p in enumerate(theta_p):
+        for tp_index, _theta_p in enumerate(theta_p):
+            theta_steps = int(_theta_p/dt)
+            for step in range(0, steps):#-int(_theta_p/dt)): #  can't get ground truth at time n so remove the last max theta_p steps
                 if model == 'llp':
-                    diff = z[step + int(_theta_p/dt), dim] - zhat[step, tp_index, dim]
-                elif model == 'ldn':
-                    # start at max theta_p steps in
-                    diff = z[int(max(theta_p)/dt) + step - int(_theta_p/dt), dim] - zhat[int(max(theta_p)/dt) + step, tp_index, dim]
+                    # stop at the last theta seconds, since we won't have the future theta
+                    # seconds of ground truth to compare to
+                    if step < steps - theta_steps:
+                        diff = z[step + theta_steps, dim] - zhat[step, tp_index, dim]
+                        errors[step, tp_index, dim] = diff
 
-                errors[step, tp_index, dim] = diff
+                elif model == 'ldn':
+                    # shift forward by theta since we can't say what happened theta seconds
+                    # ago before theta seconds pass
+                    if step > theta_steps:
+                        diff = z[step - theta_steps, dim] - zhat[step, tp_index, dim]
+                        errors[step, tp_index, dim] = diff
 
     return np.asarray(errors)
 

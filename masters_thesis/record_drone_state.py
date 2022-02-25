@@ -17,7 +17,7 @@ else:
 print(f"Collecting data for {n_targets} target reach")
 
 airsim_dt = 0.01
-save_location = '100_linear_targets'
+save_location = '100_linear_targets_faster'
 
 # Accepts 12D state as input and outputs a 4D control signal in radians/second
 # in the rotor order: [front_right, rear_left, front_left, rear_right]
@@ -38,7 +38,7 @@ pd_ctrl = PD(
 
 # Path planner motion profiles
 Pprof = Linear()
-Vprof = Gaussian(dt=airsim_dt, acceleration=1)
+Vprof = Gaussian(dt=airsim_dt, acceleration=3)
 path = PathPlanner(
         pos_profile=Pprof,
         vel_profile=Vprof,
@@ -97,7 +97,7 @@ try:
                 dt=airsim_dt,
                 buffer_reach_time=0,
                 use_start_location=True,
-                max_velocity=4,
+                max_velocity=6,
                 start_velocity=0,
                 target_velocity=0
         )

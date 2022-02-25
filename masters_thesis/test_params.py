@@ -8,13 +8,14 @@ import os
 from plotting import plot_pred, plot_error
 from train import run_model
 
+rerun = True
+animate = False
 if len(sys.argv) > 1:
-    # pass in False to just reload the test results
-    rerun = eval(sys.argv[1])
-else:
-    rerun = True
+    if 'animate' in sys.argv or 'gif' in sys.argv:
+        animate = True
+    if 'load' in sys.argv or 'norerun' in sys.argv:
+        rerun = False
 
-animate = True
 experiment_id = 'train/param_set_0002'
 notes = (
 """
@@ -25,8 +26,8 @@ notes = (
 dt = 0.01
 n_neurons = 2000
 theta = 1.0
-# theta_p = np.linspace(dt, 0.5*theta, int(theta/dt))
-theta_p = np.linspace(dt, theta, int(theta/dt))
+theta_p = np.linspace(dt, 0.5*theta, int(theta/dt))
+# theta_p = np.linspace(dt, theta, int(theta/dt))
 print(theta_p)
 print(len(theta_p))
 seed = 47
@@ -40,24 +41,24 @@ data = dat.load(
     save_location=train_data,
     parameters=['time', 'state', 'ctrl', 'state_and_error', 'clean_u']
 )
-n_data_pts = 30000
-data['time'] = data['time'][:n_data_pts]
-data['state'] = data['state'][:n_data_pts]
-data['ctrl'] = data['ctrl'][:n_data_pts]
-data['state_and_error'] = data['state_and_error'][:n_data_pts]
-data['clean_u'] = data['clean_u'][:n_data_pts]
+# n_data_pts = 30000
+# data['time'] = data['time'][:n_data_pts]
+# data['state'] = data['state'][:n_data_pts]
+# data['ctrl'] = data['ctrl'][:n_data_pts]
+# data['state_and_error'] = data['state_and_error'][:n_data_pts]
+# data['clean_u'] = data['clean_u'][:n_data_pts]
 
 print("Running with default parameters")
 
 params = {}
 # x, y, z, dx, dy, dz, a, b, g, da, db, dg
 # run_model appends ctrl to the context dims as input
-params['c_dims'] = (12, 13, 14, 20)#, 3, 4, 5) # xyz
+params['c_dims'] = (12, 13, 14, 15, 16, 17, 20)#, 3, 4, 5) # xyz
 params['z_dims'] = (12, 13, 14)
 params['q_a'] = 10
-params['q_p'] = 8
-params['q'] = 8
-params['learning_rate'] = 0.000012860959190751539
+params['q_p'] = 9
+params['q'] = 9
+params['learning_rate'] = 0.00007358722809775119
 params['n_neurons'] = 2000
 
 size_in = len(params['c_dims']) + 4
@@ -111,7 +112,7 @@ errors = calc_shifted_error(
 errors = np.absolute(errors)
 print('ERRORS: ', errors.shape)
 
-plot_error(theta_p=theta_p, errors=errors, dt=dt)
+plot_error(theta_p=theta_p, errors=errors, dt=dt, save=True)
 
 plot_pred(
     time=data['time'],
@@ -121,5 +122,6 @@ plot_pred(
     theta_p=[max(theta_p)],
     size_out=3,
     gif_name=f"{experiment_id.split('/')[-1]}.gif",
-    animate=animate
+    animate=animate,
+    save=True
 )

@@ -1,6 +1,6 @@
 """
 """
-from network.ldn import LDN
+from masters_thesis.network.ldn import LDN
 import itertools
 from numpy.polynomial.legendre import Legendre
 import nengo
@@ -31,11 +31,11 @@ class LLP(nengo.Network):
         of our prediction
     theta: float
         number of seconds into the future to predict
-    learning: bool
+    # DEPRECATED | learning: bool
         toggles learning on and off
     decoders: float array, Optional (Default: np.zeros)
         the decoders to scale our activities by to get our q legendre coefficients
-    K: float
+    learning_rate: float
         learning rate
     verbose:
         True for status print outs
@@ -50,8 +50,8 @@ class LLP(nengo.Network):
     """
 
     def __init__(
-            self, n_neurons=1000, size_in=1, size_out=1, q_a=6, q_p=6, q=6, theta=1.0,
-            learning=True, decoders=None, K=5e-8, verbose=False, theta_p=None,
+            self, n_neurons, size_in, size_out, q_a, q_p, q, theta,
+            learning=True, decoders=None, learning_rate=0.0, verbose=False, theta_p=None,
             neuron_model=nengo.LIFRate, **ens_params):
 
         # if neuron_model is None:
@@ -60,8 +60,9 @@ class LLP(nengo.Network):
         #     neuron_model = nengo.LIFRate
 
         self.theta = theta
-        self.learning = learning
-        K = K/n_neurons
+        # if learning_rate != 0.0:
+        if learning:
+            learning_rate = learning_rate/n_neurons
         # for clarity, q_r is used even though q_r == q
         q_r = q
 
@@ -111,26 +112,26 @@ class LLP(nengo.Network):
             self.z = nengo.Node(size_in=size_out, size_out=size_out, label='z')
 
             # Our neurons that will predict the future on their output connections
-            neurons = nengo.Ensemble(
+            self.neurons = nengo.Ensemble(
                     n_neurons=n_neurons,
                     dimensions=size_in,
                     neuron_type=neuron_model(),
                     label='neurons',
                     **ens_params)
-            nengo.Connection(self.c, neurons, synapse=None)
+            nengo.Connection(self.c, self.neurons, synapse=None)
 
             ldn_a = nengo.Node(LDN(theta=self.theta, q=q_a, size_in=n_neurons), label='ldn_activities')
-            nengo.Connection(neurons.neurons, ldn_a, synapse=None)
+            nengo.Connection(self.neurons.neurons, ldn_a, synapse=None)
 
             def llp_learning_rule(t, x):
                 """
                 the learning rule is essentially the delta rule, but in the Legendre domain
 
-                dD = -KA(MQS - zd)
+                dD = -learning_rate*A(MQS - zd)
 
                     dD: the change in decoders for the legendre domain decoders
                         shape: n_neurons*q*output_dims
-                    -K: learning rate
+                    -learning_rate: learning rate
                     A: legendre space activities
                         shape: n_neurons*q_a
                     M: legendre space representation of our legendre space predictions of
@@ -150,7 +151,8 @@ class LLP(nengo.Network):
                 """
                 a = x[-n_neurons:]
 
-                if self.learning:
+                # if learning_rate != 0.0:
+                if learning:
                     A = x[:sizes['A']]
                     A = np.reshape(A, shapes['A'])
 
@@ -162,7 +164,7 @@ class LLP(nengo.Network):
                     zd = np.einsum("m, ar->mar", z, d)
                     MQS = np.einsum("pmq, qapr->mar", M, QS)
                     error = np.subtract(MQS,  zd)
-                    dD = -K * np.einsum("Na, mar->Nrm", A, error)
+                    dD = -learning_rate * np.einsum("Na, mar->Nrm", A, error)
                     self.decoders += dD
 
                 y = np.einsum("N, Nqm->qm", a, self.decoders)
@@ -202,7 +204,7 @@ class LLP(nengo.Network):
 
             # our current neural activity
             nengo.Connection(
-                neurons.neurons,
+                self.neurons.neurons,
                 self.Z[-n_neurons:],
                 synapse=None)
 

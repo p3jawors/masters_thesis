@@ -7,6 +7,16 @@ from tqdm import tqdm
 from masters_thesis.network.ldn import LDN
 import matplotlib.pyplot as plt
 
+def calc_nni_err(errors):
+    """
+    Input is results from calc_shifted_error()
+    Output is a single value that can be used for optimization
+    """
+    errors = np.absolute(errors)
+    error = sum(sum(sum(errors)))
+    return error
+
+
 def calc_ldn_repr_err(z, qvals, theta, theta_p, dt=0.01, return_zhat=False):
     """
     Shows error of representation of decoded LDN at theta_p values, vary
@@ -125,6 +135,8 @@ def calc_shifted_error(z, zhat, dt, theta_p, model='llp'):
         'ldn' to get shifted error for ldn. In this case we shift our
         ground truth backward in time
     """
+    if not isinstance(theta_p, (list, np.ndarray)):
+        theta_p = [theta_p]
     print('calc shifted error')
     print('z shape: ', z.shape)
     print('zhat shape: ', zhat.shape)

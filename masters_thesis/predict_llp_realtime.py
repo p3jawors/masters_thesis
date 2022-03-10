@@ -1,3 +1,14 @@
+"""
+Run the LLP Controller in airsim and visualize the predictions of future position
+"""
+# TODO
+"""
+- add adaptive controller
+- add visualization or prediction
+- add llp controller
+- add data saving
+- add plotting to view results
+"""
 import numpy as np
 import nengo
 from llp import LLP

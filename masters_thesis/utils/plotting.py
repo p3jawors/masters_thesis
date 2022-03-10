@@ -1,17 +1,20 @@
+# TODO update to save figures in data/figures folder
 # import matplotlib
 # matplotlib.use('TkAgg')
 
 import matplotlib.pyplot as plt
 from matplotlib.ticker import LinearLocator
 from matplotlib import cm
-# import seaborn as sb
 import imageio
 import os
 import numpy as np
 
 def plot_pred(
         time, z, zhat, theta_p, size_out, gif_name, animate=True, window=None,
-        step=None, save=False):
+        step=None, save=False, folder='Figures'):
+
+    if not os.path.exists(folder):
+        os.makedirs(folder)
 
     if zhat.ndim == 2:
         zhat = zhat[:, np.newaxis, :]
@@ -45,7 +48,7 @@ def plot_pred(
             + [f'{labels[ii]} shifted: ' + str(round(tp, 3)) for tp in theta_p],
             loc=1)
     if save:
-        plt.savefig('llp_prediction_over_time.jpg')
+        plt.savefig(f'{folder}/llp_prediction_over_time.jpg')
 
     if animate:
         print('Generating gif...')
@@ -70,17 +73,14 @@ def plot_pred(
             stop += step
             ss += 1
 
-        if not os.path.exists('Figures'):
-            os.makedirs('Figures')
-
-        with imageio.get_writer(f"Figures/{gif_name}", mode='I') as writer:
+        with imageio.get_writer(f"{folder}/{gif_name}", mode='I') as writer:
             for filename in filenames:
                 image = imageio.imread(filename)
                 writer.append_data(image)
                 os.remove(filename)
     plt.show()
 
-def plot_error(theta_p, errors, dt, output_labs=('X', 'Y', 'Z'), theta=None, save=False, label=''):
+def plot_error(theta_p, errors, dt, output_labs=('X', 'Y', 'Z'), theta=None, save=False, label='', folder='Figures'):
     """
     Parameters
     ----------
@@ -92,6 +92,9 @@ def plot_error(theta_p, errors, dt, output_labs=('X', 'Y', 'Z'), theta=None, sav
         the errors returns from utils.calc_shifted_error (steps, len(theta_p), m),
         where m is the number of output dims
     """
+    if not os.path.exists(folder):
+        os.makedirs(folder)
+
     time = np.linspace(0, errors.shape[0]*dt, errors.shape[0])
 
     if theta is None:
@@ -106,7 +109,7 @@ def plot_error(theta_p, errors, dt, output_labs=('X', 'Y', 'Z'), theta=None, sav
         plt.show()
 
         if save:
-            plt.savefig(f'{label}2norm_over_time.jpg')
+            plt.savefig(f'{folder}/{label}2norm_over_time.jpg')
 
     if len(theta_p) > 1:
         # Plot a 3d plot for each xyz output dim
@@ -122,12 +125,12 @@ def plot_error(theta_p, errors, dt, output_labs=('X', 'Y', 'Z'), theta=None, sav
             surf = axs[ii].plot_surface(X, Y, errors[:, :, ii].T,
                     cmap=cm.coolwarm, linewidth=0, antialiased=False)
             axs[ii].zaxis.set_major_locator(LinearLocator(10))
-            axs[ii].zaxis.set_major_formatter('{x:.02f}')
+            # axs[ii].zaxis.set_major_formatter('{x:.02f}')
             fig.colorbar(surf, shrink=0.5, aspect=5)
         # plt.show()
 
         if save:
-            plt.savefig(f'{label}3d_error_heat_map.jpg')
+            plt.savefig(f'{folder}/{label}3d_error_heat_map.jpg')
 
 
         # Plot a 2d heat map of the above
@@ -155,7 +158,7 @@ def plot_error(theta_p, errors, dt, output_labs=('X', 'Y', 'Z'), theta=None, sav
             # fig.colorbar(surf, shrink=0.5, aspect=5)
 
         if save:
-            plt.savefig(f'{label}2d_error_heat_map.jpg')
+            plt.savefig(f'{folder}/{label}2d_error_heat_map.jpg')
 
 
         # Plot avg error over time, averaging over theta_p
@@ -175,7 +178,7 @@ def plot_error(theta_p, errors, dt, output_labs=('X', 'Y', 'Z'), theta=None, sav
                 axs[ii].plot(time, np.linalg.norm(np.mean(errors, axis=1), axis=1))
 
         if save:
-            plt.savefig(f'{label}error_over_time_avg_tp.jpg')
+            plt.savefig(f'{folder}/{label}error_over_time_avg_tp.jpg')
 
     # Plot avg error over time, showing each theta_p line
     plt.figure(figsize=(8,12))
@@ -195,12 +198,12 @@ def plot_error(theta_p, errors, dt, output_labs=('X', 'Y', 'Z'), theta=None, sav
                 plt.ylabel(f'2norm Error of Mean Over Theta_P')
                 # axs[ii].plot(time, np.linalg.norm(np.mean(errors, axis=1), axis=1))
                 axs[ii].plot(time, np.linalg.norm(errors[:, tp, :], axis=1), alpha=alpha, label=f"{_theta_p}")#, c='r')
-        plt.legend()
+        plt.legend(loc=1)
 
     # plt.show()
 
     if save:
-        plt.savefig(f'{label}error_over_time.jpg')
+        plt.savefig(f'{folder}/{label}error_over_time.jpg')
 
     # Plot avg error over theta_p, averaging over time
     if len(theta_p) > 1:
@@ -214,12 +217,12 @@ def plot_error(theta_p, errors, dt, output_labs=('X', 'Y', 'Z'), theta=None, sav
             axs[ii].plot(theta_p, np.mean(errors[:, :, ii], axis=0))
 
         if save:
-            plt.savefig(f'{label}error_over_tp.jpg')
+            plt.savefig(f'{folder}/{label}error_over_tp.jpg')
 
     if not save:
         plt.show()
 
-def plot_ldn_repr_error(error, theta_p, z, dt, zhats, output_labs=('X', 'Y', 'Z'), label=None):
+def plot_ldn_repr_error(error, theta, theta_p, z, dt, zhats, output_labs=('X', 'Y', 'Z'), label=None, folder='Figures'):
     """
     Parameters
     ----------
@@ -229,6 +232,9 @@ def plot_ldn_repr_error(error, theta_p, z, dt, zhats, output_labs=('X', 'Y', 'Z'
     theta_p: list
         list of theta_p values in seconds
     """
+    if not os.path.exists(folder):
+        os.makedirs(folder)
+
     def get_shifted_t(theta_p, dt, steps, direction='forward'):
         """
         """
@@ -260,9 +266,9 @@ def plot_ldn_repr_error(error, theta_p, z, dt, zhats, output_labs=('X', 'Y', 'Z'
             plt.plot(t, z, label='z')
             plt.plot(shifted_t, z, label=f'z shift>>{theta_p[ii]}')
             plt.plot(t, zhats[key][:, ii, :], label=f'zhat_{theta_p[ii]}', linestyle='--')
-            plt.legend()
-            plt.savefig(f"{label}_q={key}-tp={theta_p[ii]}.jpg")
+            plt.legend(loc=1)
+            plt.savefig(f"{folder}/{label}_q={key}-tp={theta_p[ii]}.jpg")
 
-        plotting.plot_error(
+        plot_error(
             theta_p=theta_p, errors=error[key], dt=dt, output_labs=output_labs,
             theta=theta, save=True, label=f"q={key}_")

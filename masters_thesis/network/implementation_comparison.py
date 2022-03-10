@@ -33,6 +33,7 @@ with model:
 
 
     #===Pawels implementation
+    dt = 0.001
     llp = LLP(
             n_neurons=1000,
             size_in=2,
@@ -41,16 +42,15 @@ with model:
             q_p=q,
             q=q,
             theta=np.max(t_delays),
-            dt=0.001,
             learning=True,
-            K=learning_rate,
+            learning_rate=learning_rate/dt,
             seed=0,
             verbose=True,
     )
 
     f = 5
 
-    nengo.Connection(c, llp.input, synapse=None)
+    nengo.Connection(c, llp.c, synapse=None)
     nengo.Connection(z, llp.z, synapse=None)
 
     display_2 = nengo.Node(None, size_in=1+len(t_delays))

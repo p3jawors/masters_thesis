@@ -1,3 +1,12 @@
+"""
+Runs airsim sim of drone going to targets to generate training data
+"""
+# TODO
+"""
+- add adaptive controller
+- add llp controller
+"""
+
 import numpy as np
 import nengo
 import sys
@@ -9,6 +18,117 @@ from abr_control.controllers.path_planners import PathPlanner
 from abr_control.controllers.path_planners.position_profiles import Linear
 from abr_control.controllers.path_planners.velocity_profiles import Gaussian
 from abr_analyze import DataHandler
+# force_params = {
+#         'id': 'force_params',
+#         'n_neurons': 1000,
+#         'n_ensembles': 1,
+#         'n_input': 4,
+#         'n_output': 4,
+#         'intercepts': None,
+#         'intercept_bounds': [0.0, 0.0, 0.1],
+#         'encoders': None,
+#         'weights': None,
+#         'learning_rate': None,
+#         'tau_input': None,
+#         'tau_output': 0.05,
+#         'tau_training': 0.05,
+#         'spherical': True,
+#         'input_dims': [0, 1, 2],
+#         'training_dims': np.arange(12),
+#         'offchip_scale': None,
+#         'training_error_limit': 300,
+#     }
+#
+# angle_params = {
+#         'id': 'angle_params',
+#         'n_neurons': 1000,
+#         'n_ensembles': 1,
+#         'n_input': 1,
+#         'n_output': 2,
+#         'intercepts': None,
+#         'intercept_bounds': [0.0, 0.0, 0.1],
+#         'encoders': None,
+#         'weights': None,
+#         'learning_rate': None,
+#         'tau_input': None,
+#         'tau_output': 0.05,
+#         'tau_training': 0.05,
+#         'spherical': True,
+#         'input_dims': [8],
+#         'training_dims': np.arange(12),
+#         'a_gains': [
+#             2.8256250539071077,
+#             4996.076580296213,
+#             0.15854921256222543,
+#             1073.0843029984721
+#         ],
+#         'pd_gains':[
+#             9483.984536604656,
+#             4157.641221757219,
+#             2974.5495866882998,
+#             11013.455417814257,
+#             14788.192863046886,
+#             9378.21231769378,
+#             334.75328788213335,
+#             6736.005631999111
+#         ],
+#         'offchip_scale': None,
+#         'training_error_limit': 0.25,
+#
+#     }
+#
+# neural_params = {
+#         'dt': dt,
+#         'actm': False,
+#         'ac': False,
+#         'ac_allo': False,
+#         'seed': neural_seed,
+#         'force_params': force_params,
+#         'angle_params': angle_params,
+#         'means': np.array([
+#             0.4, 0.0, 0.4,
+#             0, 0, 0,
+#             0, 0, 0,
+#             0, 0, 0]),
+#         'variances': np.array([
+#             3.1, 2.8, 2.5,
+#             1.4, 1.4, 1.4,
+#             0.6, 0.523, 3.14,
+#             1.6, 1.6, 1.6]),
+#
+#         'pes_wgt_exp': 4
+# }
+
+
+# if backend != 'pd':
+#     print('Nengo CPU Control - learning')
+#     neural_params['angle_params']['learning_rate'] = 1.968503937007874e-05
+#     neural_params['force_params']['learning_rate'] = 0.11811023622047243
+#     neural_params['angle_params']['offchip_scale'] = 1
+#     neural_params['force_params']['offchip_scale'] = 1
+#     neural_params['pes_wgt_exp'] = None
+#
+#
+#     controller = neural.Neural(
+#         seed=neural_params['seed'],
+#         force_params=neural_params['force_params'],
+#         angle_params=neural_params['angle_params'],
+#         means=neural_params['means'],
+#         variances=neural_params['variances'],
+#         use_probes=debug,
+#         backend=backend,
+#         dt=neural_params['dt']
+#     )
+# else:
+#     controller = pd.PD(
+#         seed=neural_params['seed'],
+#         use_probes=debug,
+#         backend=backend,
+#         dt=neural_params['dt'],
+#         tau_output=neural_params['angle_params']['tau_output'],
+#         gains=neural_params['angle_params']['pd_gains']
+#     )
+
 
 if len(sys.argv)>1:
     n_targets = int(sys.argv[1])
@@ -17,7 +137,12 @@ else:
 print(f"Collecting data for {n_targets} target reach")
 
 airsim_dt = 0.01
-save_location = '100_linear_targets_faster'
+save_location = '100_linear_targets_faster_0001'
+notes = (
+"""
+- recording activities now, otherwise same as 100_linear_targets_faster
+"""
+)
 
 # Accepts 12D state as input and outputs a 4D control signal in radians/second
 # in the rotor order: [front_right, rear_left, front_left, rear_right]
@@ -149,5 +274,6 @@ finally:
     for key, val in probes.items():
         data[key] = sim.data[val]
     data['time'] = sim.trange()
+    data['notes'] = notes
     dat.save(data=data, save_location=save_location, overwrite=True)
     interface.disconnect()

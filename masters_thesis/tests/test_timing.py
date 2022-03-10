@@ -1,5 +1,5 @@
 import numpy as np
-from utils import decode_ldn_data, calc_shifted_error
+from masters_thesis.utils.eval_utils import decode_ldn_data, calc_shifted_error
 import timeit
 import matplotlib.pyplot as plt
 """

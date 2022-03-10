@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import utils
+from masters_thesis.utils import eval_utils as utils
 
 # NOTE: TEST calc_shifted_error
 dt = 0.001
@@ -70,7 +70,9 @@ results = utils.calc_ldn_repr_err(
     dt=dt
 )
 plt.figure()
-plt.plot(qvals, results)
+for key, val in results.items():
+    plt.plot(np.squeeze(val), label=key)
+plt.legend()
 plt.show()
 
 

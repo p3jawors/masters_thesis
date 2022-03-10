@@ -43,7 +43,7 @@ with model:
             q=q,
             theta=np.max(t_delays),
             learning=True,
-            learning_rate=learning_rate/dt,
+            learning_rate=learning_rate*dt,
             seed=0,
             verbose=True,
     )

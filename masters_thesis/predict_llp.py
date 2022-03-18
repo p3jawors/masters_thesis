@@ -21,6 +21,12 @@ def run_model(c_state, z_state, control, dt, record_activities=False, **llp_args
     """
 
     """
+    if c_state.ndim == 1:
+        c_state = c_state[:, np.newaxis]
+    if z_state.ndim == 1:
+        z_state = z_state[:, np.newaxis]
+    if control.ndim == 1:
+        control = control[:, np.newaxis]
 
     model = nengo.Network()
     with model:

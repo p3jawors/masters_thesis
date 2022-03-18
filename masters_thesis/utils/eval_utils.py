@@ -212,3 +212,61 @@ def get_mean_and_range(data):
     # np.savetxt('data/dq_3std.txt', 3*np.array(stds))
     # np.savetxt('data/dq_range.txt', 3*np.array(ranges))
     plt.show()
+
+def gen_BLWN(T, dt, rms, limit, seed, sigma, debug=False):
+    """
+    Generates a bandwidth limited white noise signal
+    """
+    np.random.seed(seed)
+    ts = np.arange(0, T, dt)
+    N = ts.size
+    # only generate half the points since we're making it symmetric about zero
+    n_coeffs = int(N/2)+1
+
+    # gernerate bool list of invalid frequencies below nyquist
+    possible_coeffs = np.arange(0, int((T/dt)/2)+1)
+    #print('possible: ', possible_coeffs)
+    invalid_coeffs = possible_coeffs > limit
+    #print('invalid: ', invalid_coeffs)
+
+    # generate random real and imaginary values
+    X_w = 1j * np.random.normal(scale=sigma, size=(n_coeffs,))
+    X_w += np.random.normal(scale=sigma, size=(n_coeffs,))
+    X_w[0] = 0
+    X_w[-1] = X_w[-1].real
+    X_w[invalid_coeffs] = 0
+    # Stack our frequencies to create the negative entries
+    """
+    np.fft.ifft wants order...
+    a[0] should contain the zero frequency term,
+    a[1:n//2] should contain the positive-frequency terms,
+    a[n//2 + 1:] should contain the negative-frequency terms, starting from most negative
+    """
+    #X_w = np.hstack((X_w, -np.flip(X_w[1:])))
+    X_w = np.hstack((X_w, np.conj(np.flip(X_w[1:]))))
+    #print('xw: ', X_w)
+    x_t = np.real(np.fft.ifft(X_w))
+
+    rmsp, scale = RMSP(x_t, T, rms, debug=False)
+    x_t *= scale
+    X_w *= scale
+    rmsp, _ = RMSP(x_t, T, debug=debug)
+
+    return x_t, X_w
+
+def RMSP(x_t, T, des_rmsp=None, debug=False, dt=0.001):
+    #rmsp = np.sqrt(1/T * sum(np.square(x_t)))*dt
+
+    sig = 0
+    for ii in range(0, len(x_t)):
+        sig += x_t[ii]**2
+    sig /=T
+    sig *= dt
+    rmsp = np.sqrt(sig)
+
+    if debug:
+        print('Root Mean Square Power: ', rmsp)
+    if des_rmsp is not None:
+        scale = des_rmsp / rmsp
+        return rmsp, scale
+    return rmsp, 1

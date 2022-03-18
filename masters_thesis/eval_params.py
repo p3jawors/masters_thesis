@@ -31,9 +31,7 @@ data_params = json_params['data']
 llp_params = json_params['llp']
 params = json_params['general']
 
-# add a few missing llp params that we can calculate
-llp_params['size_in'] = len(data_params['c_dims']) + 4
-llp_params['size_out'] = len(data_params['z_dims'])
+# get the neuron model object to match the string in the param file
 model_str = llp_params['neuron_model']
 if llp_params['neuron_model'] == 'nengo.LIFRate':
     llp_params['neuron_model'] = nengo.LIFRate
@@ -64,10 +62,23 @@ ctrl = data[data_params['ctrl_key']][
 times = data['time'][data_params['dataset_range'][0]:data_params['dataset_range'][1]]
 
 # extract our desired dimensions to use as context, it is assumed all ctrl dims are used
+print('FULL: ', full_state.shape)
 c_state = np.take(full_state, indices=data_params['c_dims'], axis=1)
 z_state = np.take(full_state, indices=data_params['z_dims'], axis=1)
 
-# NOTE used to scale learning rate by dt here, llp class scales by 1/n_neurons still
+# add a few missing llp params that we can calculate
+if ctrl.ndim == 1:
+    # print(ctrl.shape)
+    ctrl = ctrl[:, np.newaxis]
+    # print(ctrl.shape)
+print("CTRL SHAPE: ", ctrl.shape)
+print("C: ", c_state.shape)
+llp_params['size_in'] = len(data_params['c_dims']) + ctrl.shape[1]
+llp_params['size_out'] = len(data_params['z_dims'])
+
+
+# NOTE scaling learning rate by dt here, llp class scales by 1/n_neurons
+llp_params['learning_rate'] *= params['dt']
 results = predict_llp.run_model(
     c_state=c_state,
     z_state=z_state,

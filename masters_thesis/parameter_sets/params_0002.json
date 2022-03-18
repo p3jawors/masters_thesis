@@ -1,0 +1,27 @@
+{
+   "data": {
+        "db_name": "codebase_test_set",
+        "database_dir": "data/databases",
+        "dataset": "sin5t",
+        "state_key": "state",
+        "ctrl_key": "control",
+        "dataset_range": [0, -1],
+        "c_dims": [0, 1],
+        "z_dims": [0]
+    },
+   "llp": {
+        "n_neurons": 1000,
+        "theta": 0.1,
+        "q": 6,
+        "q_a": 6,
+        "q_p": 6,
+        "learning_rate": 5e-5,
+        "neuron_model": "nengo.LIFRate"
+    },
+    "general": {
+        "run_nni": false,
+        "dt": 0.001,
+        "seed": 47,
+        "theta_p": [0.1]
+    }
+}

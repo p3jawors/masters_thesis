@@ -2,24 +2,28 @@ import numpy as np
 import matplotlib.pyplot as plt
 from masters_thesis.utils import eval_utils as utils
 
-# NOTE: TEST calc_shifted_error
 dt = 0.001
 T = 1 # 1 sec sim
 theta_p = 0.1
 t = np.linspace(0, 2*np.pi, int(T/dt))
+
+# get time windows for our ideal llp and ldn functions
+# the ideal ldn would represent values from the past start-theta_p to t-theta_p
+# the ideal llp would represent values from the past start+theta_p to t+theta_p
+# ignoring times we don't have values to learn, this is just to test the error
+# calculating function
 t_base = t[int(2*theta_p/dt):-int(2*theta_p/dt)]
 t_ldn = t[int(theta_p/dt):-int(3*theta_p/dt)]
 t_llp = t[int(3*theta_p/dt):-int(theta_p/dt)]
-# print(f"{t_base=}")
-# print(f"{t_ldn=}")
-# print(f"{t_llp=}")
-# data used as input
+
+# the output from an ideal ldn and llp representation of the base function
 train_data = np.sin(t_base)
 ldn_data = np.sin(t_ldn)
 llp_data = np.sin(t_llp)
 
 plt.figure()
 ax = plt.subplot(211)
+plt.title('Ideal llp and ldn output to test error function')
 plt.xlabel('Time [sec]')
 plt.plot(t_base, train_data, label='input data')
 plt.plot(t_ldn, ldn_data, label='perfect ldn', linestyle='--')
@@ -37,6 +41,7 @@ plt.legend()
 plt.show()
 
 
+print('Testing calc_shifted_error(ldn)')
 # ldn
 error_ldn = utils.calc_shifted_error(
     z=train_data[:, np.newaxis],
@@ -47,6 +52,7 @@ error_ldn = utils.calc_shifted_error(
 )
 
 
+print('Testing calc_shifted_error(llp)')
 # llp
 error_llp = utils.calc_shifted_error(
     z=train_data[:, np.newaxis],
@@ -56,10 +62,11 @@ error_llp = utils.calc_shifted_error(
     model='llp'
 )
 
-print(sum(sum(error_ldn)))
-print(sum(sum(error_llp)))
+print('SUM LDN ERROR: ', sum(sum(error_ldn)))
+print('SUM LLP ERROR: ', sum(sum(error_llp)))
 
 
+print("testing calc_ldn_repr_error")
 qvals = np.arange(1, 10)
 #NOTE test repr error calc
 results = utils.calc_ldn_repr_err(

@@ -16,7 +16,7 @@ train_data = '100_linear_targets' #  90820 temporal data points
 dat = DataHandler(db_name, database_dir='data/databases')
 data = dat.load(
     save_location=train_data,
-    parameters=['ctrl']
+    parameters=['ctrl', 'time']
 )
 
 data['gravity_rpm'] = 6800
@@ -36,7 +36,7 @@ for key in keys:
     for ii in range(0, n_subs):
         plt.subplot(n_subs, 1, ii+1)
         plt.title(f"{key}")
-        plt.plot(val.T[ii], label=f"{ii}")
+        plt.plot(data['time'], val.T[ii], label=f"{ii}")
 plt.show()
 
 if not view:

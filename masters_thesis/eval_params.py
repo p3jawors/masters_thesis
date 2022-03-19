@@ -25,6 +25,11 @@ if not os.path.exists(folder):
 # else:
 with open(sys.argv[1]) as fp:
     json_params = json.load(fp)
+param_id = sys.argv[1].split('/')[-1].split('.')[0]
+
+load_results = True
+if len(sys.argv) == 2:
+    load_results == bool(sys.argv[2])
 
 # split into separate dicts for easier use
 data_params = json_params['data']
@@ -79,13 +84,21 @@ llp_params['size_out'] = len(data_params['z_dims'])
 
 # NOTE scaling learning rate by dt here, llp class scales by 1/n_neurons
 llp_params['learning_rate'] *= params['dt']
-results = predict_llp.run_model(
-    c_state=c_state,
-    z_state=z_state,
-    control=ctrl,
-    dt=params['dt'],
-    **llp_params
-)
+
+if load_results:
+    results = dat.load(
+        save_location=f"eval/{param_id}/results",
+        parameters=['Z']
+    )
+    print(results)
+else:
+    results = predict_llp.run_model(
+        c_state=c_state,
+        z_state=z_state,
+        control=ctrl,
+        dt=params['dt'],
+        **llp_params
+    )
 
 zhat = decode_ldn_data(
     Z=results['Z'],
@@ -106,18 +119,18 @@ if params['run_nni']:
     print('final error: ', nni_error)
 else:
     # save params to the json name
-    param_id = sys.argv[1].split('/')[-1].split('.')[0]
-    dat.save(
-        save_location=f"eval/{param_id}/results",
-        data=results,
-        overwrite=True
-    )
-    json_params['llp']['neuron_model'] = model_str
-    dat.save(
-        save_location=f"eval/{param_id}/params",
-        data=json_params,
-        overwrite=True
-    )
+    if not load_results:
+        dat.save(
+            save_location=f"eval/{param_id}/results",
+            data=results,
+            overwrite=True
+        )
+        json_params['llp']['neuron_model'] = model_str
+        dat.save(
+            save_location=f"eval/{param_id}/params",
+            data=json_params,
+            overwrite=True
+        )
 
     plot_error(theta_p=params['theta_p'], errors=errors, dt=params['dt'])
 

@@ -41,11 +41,13 @@ def plot_pred(
         plt.gca().set_prop_cycle(None)
         for pred in theta_p:
             axs[ii].plot(time-pred, z.T[ii], linestyle='--')
+            axs[ii].plot(time, z.T[ii], linestyle='-')
             # axs[ii].plot(time, z.T[ii], linestyle='--')
 
         axs[ii].legend(
             [f'{labels[ii]}hat at: ' + str(round(tp, 3)) for tp in theta_p]
-            + [f'{labels[ii]} shifted: ' + str(round(tp, 3)) for tp in theta_p],
+            + [f'{labels[ii]} shifted: ' + str(round(tp, 3)) for tp in theta_p]
+            + [f'{labels[ii]} actual: ' + str(round(tp, 3)) for tp in theta_p],
             loc=1)
     if save:
         plt.savefig(f'{folder}/llp_prediction_over_time.jpg')

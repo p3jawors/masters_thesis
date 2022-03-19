@@ -2,6 +2,8 @@
 # import matplotlib
 # matplotlib.use('TkAgg')
 
+from tqdm import tqdm
+import imageio
 import matplotlib.pyplot as plt
 from matplotlib.ticker import LinearLocator
 from matplotlib import cm
@@ -274,3 +276,106 @@ def plot_ldn_repr_error(error, theta, theta_p, z, dt, zhats, output_labs=('X', '
         plot_error(
             theta_p=theta_p, errors=error[key], dt=dt, output_labs=output_labs,
             theta=theta, save=True, label=f"q={key}_")
+
+def animate_dataset(dat_arr, time, sec_between_data_captures=1, tail_len=5, time_multiplier=10, flip_z=True):
+    """
+    Parameters
+    ----------
+    dat_arr: 2d array of floats
+        shape(steps, dim)
+    time: 1d array of floats
+        shape(steps,)
+        the cumulative time [sec]
+    sec_between_data_captures: float
+        the time resolution to capture data frames at
+        This is the 
+    fps: int
+        frames per second of gif
+    tail_len: float
+        how many seconds of path to show at a given moment [sec]
+    flip_z: bool, Optional (Default: True)
+        flip sign of z. Helpful for plotting data in NED coordinates
+    """
+    if not os.path.exists('.cache'):
+        os.makedirs('.cache')
+    for file in os.listdir('.cache'):
+        if file.endswith('.png'):
+            os.remove(f".cache/{file}")
+
+    if flip_z:
+        dat_arr[:, 2] *= -1
+        dat_arr[:, 5] *= -1
+    print(dat_arr.shape)
+    minx, maxx = [np.amin(dat_arr[:, 0]), np.amax(dat_arr[:, 0])]
+    miny, maxy = [np.amin(dat_arr[:, 1]), np.amax(dat_arr[:, 1])]
+    minz, maxz = [np.amin(dat_arr[:, 2]), np.amax(dat_arr[:, 2])]
+    dt = np.mean(np.diff(time))
+    tail_steps = int(tail_len/dt)
+
+    last_cap = 0.0
+    ii = 0
+    fnames = []
+    for step, runtime in enumerate(tqdm(time)):
+        if (runtime - last_cap) >= sec_between_data_captures:
+            last_cap = runtime
+            fig = plt.figure()
+            ax = plt.subplot(111, projection='3d')
+            ax.set_xlim(minx, maxx)
+            ax.set_ylim(miny, maxy)
+            ax.set_zlim(minz, maxz)
+            plt.plot(
+                dat_arr[:step, 0],
+                dat_arr[:step, 1],
+                dat_arr[:step, 2],
+                alpha=0.25,
+                label='Past Trajectory'
+            )
+            plt.plot(
+                dat_arr[max(0, step-tail_steps):step, 0],
+                dat_arr[max(0, step-tail_steps):step, 1],
+                dat_arr[max(0, step-tail_steps):step, 2],
+                label=f"Last {tail_len} sec"
+            )
+            ax.scatter(
+                dat_arr[step-1, 0],
+                dat_arr[step-1, 1],
+                dat_arr[step-1, 2],
+                color='r',
+            )
+            plt.plot([maxx, maxx-1], [maxy, maxy], [maxz, maxz], label='1m in x', c='r')
+            plt.plot([maxx, maxx], [maxy, maxy-1], [maxz, maxz], label='1m in y', c='g')
+            plt.plot([maxx, maxx], [maxy, maxy], [maxz, maxz-1], label='1m in z', c='b')
+
+            ax.text2D(0.75, 0.95, f"Time: {time[step]} sec", transform=ax.transAxes)
+            plt.legend()
+
+            fname = f".cache/{ii:04d}.png"
+            fnames.append(fname)
+            plt.savefig(fname)
+            fig.clear()
+            plt.close()
+            ii += 1
+
+
+    frames = []
+    for fname in fnames:
+        frames.append(imageio.imread(fname))
+
+    # Save them as frames into a gif
+    exportname = "output.gif"
+    kargs = { 'duration': time[-1]/time_multiplier }
+    print(kargs)
+    imageio.mimsave(exportname, frames)#, time[-1]/time_multiplier)#'GIF', **kargs)
+
+if __name__ == '__main__':
+    from abr_analyze import DataHandler
+    # dat = DataHandler('codebase_test_set', 'data/databases')
+    dat = DataHandler('llp_pd', 'data/databases')
+    # dat.load('100_linear_targts', ['state', 'ctrl'])
+    data = dat.load(
+        save_location='100_linear_targets',
+        parameters=['state', 'clean_u', 'time']
+    )
+
+    animate_dataset(data['state'], data['time'])
+

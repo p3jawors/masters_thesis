@@ -277,7 +277,9 @@ def plot_ldn_repr_error(error, theta, theta_p, z, dt, zhats, output_labs=('X', '
             theta_p=theta_p, errors=error[key], dt=dt, output_labs=output_labs,
             theta=theta, save=True, label=f"q={key}_")
 
-def animate_dataset(dat_arr, time, sec_between_data_captures=1, tail_len=5, time_multiplier=10, flip_z=True):
+def traj_3d_gif(
+        dat_arr, time, save_name, sec_between_data_captures=1, tail_len=5,
+        time_multiplier=10, flip_z=True, regen_figs=True):
     """
     Parameters
     ----------
@@ -287,7 +289,7 @@ def animate_dataset(dat_arr, time, sec_between_data_captures=1, tail_len=5, time
         shape(steps,)
         the cumulative time [sec]
     sec_between_data_captures: float
-        the time resolution to capture data frames at
+        The time resolution to capture data frames at
         This is the 
     fps: int
         frames per second of gif
@@ -295,12 +297,16 @@ def animate_dataset(dat_arr, time, sec_between_data_captures=1, tail_len=5, time
         how many seconds of path to show at a given moment [sec]
     flip_z: bool, Optional (Default: True)
         flip sign of z. Helpful for plotting data in NED coordinates
+    regen_figs: bool, Optional (Default:True)
+        starts by clearing .cache then generates figures to create gif
+        if False will read figures from file in the .cache
     """
     if not os.path.exists('.cache'):
         os.makedirs('.cache')
-    for file in os.listdir('.cache'):
-        if file.endswith('.png'):
-            os.remove(f".cache/{file}")
+    if regen_figs:
+        for file in os.listdir('.cache'):
+            if file.endswith('.png'):
+                os.remove(f".cache/{file}")
 
     if flip_z:
         dat_arr[:, 2] *= -1
@@ -318,43 +324,46 @@ def animate_dataset(dat_arr, time, sec_between_data_captures=1, tail_len=5, time
     for step, runtime in enumerate(tqdm(time)):
         if (runtime - last_cap) >= sec_between_data_captures:
             last_cap = runtime
-            fig = plt.figure()
-            ax = plt.subplot(111, projection='3d')
-            ax.set_xlim(minx, maxx)
-            ax.set_ylim(miny, maxy)
-            ax.set_zlim(minz, maxz)
-            plt.plot(
-                dat_arr[:step, 0],
-                dat_arr[:step, 1],
-                dat_arr[:step, 2],
-                alpha=0.25,
-                label='Past Trajectory'
-            )
-            plt.plot(
-                dat_arr[max(0, step-tail_steps):step, 0],
-                dat_arr[max(0, step-tail_steps):step, 1],
-                dat_arr[max(0, step-tail_steps):step, 2],
-                label=f"Last {tail_len} sec"
-            )
-            ax.scatter(
-                dat_arr[step-1, 0],
-                dat_arr[step-1, 1],
-                dat_arr[step-1, 2],
-                color='r',
-            )
-            plt.plot([maxx, maxx-1], [maxy, maxy], [maxz, maxz], label='1m in x', c='r')
-            plt.plot([maxx, maxx], [maxy, maxy-1], [maxz, maxz], label='1m in y', c='g')
-            plt.plot([maxx, maxx], [maxy, maxy], [maxz, maxz-1], label='1m in z', c='b')
-
-            ax.text2D(0.75, 0.95, f"Time: {time[step]} sec", transform=ax.transAxes)
-            plt.legend()
 
             fname = f".cache/{ii:04d}.png"
             fnames.append(fname)
-            plt.savefig(fname)
-            fig.clear()
-            plt.close()
             ii += 1
+
+            if regen_figs:
+                fig = plt.figure()
+                ax = plt.subplot(111, projection='3d')
+                ax.set_xlim(minx, maxx)
+                ax.set_ylim(miny, maxy)
+                ax.set_zlim(minz, maxz)
+                plt.plot(
+                    dat_arr[:step, 0],
+                    dat_arr[:step, 1],
+                    dat_arr[:step, 2],
+                    alpha=0.25,
+                    label='Past Trajectory'
+                )
+                plt.plot(
+                    dat_arr[max(0, step-tail_steps):step, 0],
+                    dat_arr[max(0, step-tail_steps):step, 1],
+                    dat_arr[max(0, step-tail_steps):step, 2],
+                    label=f"Last {tail_len} sec"
+                )
+                ax.scatter(
+                    dat_arr[step-1, 0],
+                    dat_arr[step-1, 1],
+                    dat_arr[step-1, 2],
+                    color='r',
+                )
+                plt.plot([maxx, maxx-1], [maxy, maxy], [maxz, maxz], label='1m in x', c='r')
+                plt.plot([maxx, maxx], [maxy, maxy-1], [maxz, maxz], label='1m in y', c='g')
+                plt.plot([maxx, maxx], [maxy, maxy], [maxz, maxz-1], label='1m in z', c='b')
+
+                ax.text2D(0.75, 0.95, f"Time: {time[step]} sec", transform=ax.transAxes)
+                plt.legend()
+
+                plt.savefig(fname)
+                fig.clear()
+                plt.close()
 
 
     frames = []
@@ -362,10 +371,35 @@ def animate_dataset(dat_arr, time, sec_between_data_captures=1, tail_len=5, time
         frames.append(imageio.imread(fname))
 
     # Save them as frames into a gif
-    exportname = "output.gif"
     kargs = { 'duration': time[-1]/time_multiplier }
-    print(kargs)
-    imageio.mimsave(exportname, frames)#, time[-1]/time_multiplier)#'GIF', **kargs)
+    imageio.mimsave(
+        f"{save_name}_{time_multiplier}x.gif",
+        frames,
+        fps=120
+        # duration=time[-1]/time_multiplier
+    )#, time[-1]/time_multiplier)#'GIF', **kargs)
+
+def plot_data_distribution(dat_arr, dim_labels=None, bins=None, n_rows=4):
+    if bins is None:
+        bins = [0, 0.150]
+
+    j = min(dat_arr.shape[1], n_rows)
+    k = int(np.ceil(dat_arr.shape[1]/j))
+    plt.figure()
+    for ii in range(0, dat_arr.shape[1]):
+        plt.subplot(j, k, ii+1)
+        a = dat_arr[:, ii]
+        _ = plt.hist(a, bins='auto')  # arguments are passed to np.histogram
+        # plt.title("Histogram with 'auto' bins")
+        if dim_labels is not None:
+            plt.title(f"{dim_labels[ii]}")
+        else:
+            plt.title(f"{ii}")
+        # hist, bin_edges = np.histogram(a)#, bins=bins)
+        # plt.hist(hist, bin_edges)
+    plt.show()
+
+
 
 if __name__ == '__main__':
     from abr_analyze import DataHandler
@@ -377,5 +411,8 @@ if __name__ == '__main__':
         parameters=['state', 'clean_u', 'time']
     )
 
-    animate_dataset(data['state'], data['time'])
-
+    # traj_3d_gif(data['state'], data['time'], save_name='100_linear_targets', time_multiplier=100, regen_figs=False)
+    # plot_data_distribution(
+    #     data['state'],
+    #     dim_labels=['x', 'y', 'z', 'dx', 'dy', 'dz', 'a', 'b', 'g', 'da', 'db', 'dg']
+    # )

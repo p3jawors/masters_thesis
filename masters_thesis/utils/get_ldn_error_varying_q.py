@@ -7,17 +7,25 @@ import numpy as np
 from masters_thesis.utils import plotting
 from abr_analyze import DataHandler
 
+# dat = DataHandler('codebase_test_set', 'data/databases')
+# data = dat.load(save_location='sin5t', parameters=['time', 'state'])
+# # z = data['state']
+# z = data['state'][:, 0]
+# z = z[:, np.newaxis]
+
 db_name = 'llp_pd'
-dat = DataHandler(db_name, database_dir='../data/databases')
+dat = DataHandler(db_name, database_dir='data/databases')
 data = dat.load(save_location='train/param_set_0003', parameters=['activities', 'z'])
 act = data['activities']
 predicted_z = data['z']
 
 print('shape: ', act.shape)
 n_steps = 10000
-# raise Exception
-z = predicted_z[:n_steps, :]
-output_labs = ['x', 'y', 'z']
+# z = predicted_z[:n_steps, :]
+z = predicted_z[:n_steps, 0]
+z = z[:, np.newaxis]
+
+output_labs = None #['x', 'y', 'z']
 
 # z = act[:n_steps, 0]
 # z = z[:, np.newaxis]
@@ -33,7 +41,7 @@ label = 'activity_repr'
 
 qvals = [10]
 theta = 0.1
-theta_p = [0.5, 1.0]
+theta_p = [0.1]
 error, zhats = calc_ldn_repr_err(z, qvals, theta, theta_p, dt=dt, return_zhat=True)
 # TODO update this to subplot based on m dimensionality (n outputs)
 plotting.plot_ldn_repr_error(error, theta, theta_p, z, dt, zhats, output_labs, label)

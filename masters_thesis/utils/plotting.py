@@ -104,7 +104,7 @@ def plot_error(theta_p, errors, dt, output_labs=('X', 'Y', 'Z'), theta=None, sav
     if theta is None:
         theta = max(theta_p)
 
-    if 1 < len(theta_p) < 10:
+    if 1 <= len(theta_p) < 10:
         plt.figure(figsize=(8,8))
         for ii in range(0, len(theta_p)):
             plt.subplot(len(theta_p), 1, ii+1)
@@ -226,7 +226,7 @@ def plot_error(theta_p, errors, dt, output_labs=('X', 'Y', 'Z'), theta=None, sav
     if not save:
         plt.show()
 
-def plot_ldn_repr_error(error, theta, theta_p, z, dt, zhats, output_labs=('X', 'Y', 'Z'), label=None, folder='Figures'):
+def plot_ldn_repr_error(error, theta, theta_p, z, dt, zhats, output_labs=('X', 'Y', 'Z'), label=None, folder='Figures', max_rows=4):
     """
     Parameters
     ----------
@@ -256,22 +256,34 @@ def plot_ldn_repr_error(error, theta, theta_p, z, dt, zhats, output_labs=('X', '
     if label is None:
         label = 'testfig'
 
+    for key in zhats:
+        # output dimensionality in meat space
+        mm = zhats[key].shape[2]
+        break
+
+    jj = min(mm, max_rows)
+    kk = int(np.ceil(mm/jj))
+
     for key in error:
         # print(f"{key}: {error[key].shape}")
         for ii in range(0, len(theta_p)):
             plt.figure(figsize=(12,9))
-            plt.title(f"q={key} | theta_p={theta_p[ii]}")
+            for ll in range(0, mm):
+                plt.subplot(jj, kk, ll+1)
 
-            steps = z.shape[0]
-            shifted_t = get_shifted_t(theta_p[ii], dt, steps, direction='forward')
-            t = np.arange(0, z.shape[0]*dt, dt)
+                plt.title(f"q={key} | theta_p={theta_p[ii]}")
 
-            plt.plot(t, error[key][:, ii, :], label=f'error_{theta_p[ii]}')
-            plt.plot(t, z, label='z')
-            plt.plot(shifted_t, z, label=f'z shift>>{theta_p[ii]}')
-            plt.plot(t, zhats[key][:, ii, :], label=f'zhat_{theta_p[ii]}', linestyle='--')
-            plt.legend(loc=1)
-            plt.savefig(f"{folder}/{label}_q={key}-tp={theta_p[ii]}.jpg")
+                steps = z.shape[0]
+                shifted_t = get_shifted_t(theta_p[ii], dt, steps, direction='forward')
+                t = np.arange(0, z.shape[0]*dt, dt)
+
+                # plt.plot(t, error[key][:, ii, mm-1], label=f'error_{theta_p[ii]}')
+                plt.plot(t, z[:, mm-1], label='z')
+                plt.plot(shifted_t, z[:, mm-1], label=f'z shift>>{theta_p[ii]}')
+                plt.plot(t, zhats[key][:, ii, mm-1], label=f'zhat_{theta_p[ii]}', linestyle='--')
+                plt.legend(loc=1)
+                plt.xlabel('Time [sec]')
+        plt.savefig(f"{folder}/{label}_q={key}-tp={theta_p[ii]}.jpg")
 
         plot_error(
             theta_p=theta_p, errors=error[key], dt=dt, output_labs=output_labs,

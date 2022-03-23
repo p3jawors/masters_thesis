@@ -27,8 +27,8 @@ with open(sys.argv[1]) as fp:
     json_params = json.load(fp)
 param_id = sys.argv[1].split('/')[-1].split('.')[0]
 
-load_results = True
-if len(sys.argv) == 2:
+load_results = False
+if len(sys.argv) > 2:
     load_results == bool(sys.argv[2])
 
 # split into separate dicts for easier use
@@ -83,7 +83,7 @@ llp_params['size_out'] = len(data_params['z_dims'])
 
 
 # NOTE scaling learning rate by dt here, llp class scales by 1/n_neurons
-llp_params['learning_rate'] *= params['dt']
+# llp_params['learning_rate'] *= params['dt']
 
 if load_results:
     results = dat.load(

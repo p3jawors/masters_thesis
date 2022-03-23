@@ -112,16 +112,16 @@ class LLP(nengo.Network):
             self.z = nengo.Node(size_in=size_out, size_out=size_out, label='z')
 
             # Our neurons that will predict the future on their output connections
-            self.neurons = nengo.Ensemble(
+            self.ens = nengo.Ensemble(
                     n_neurons=n_neurons,
                     dimensions=size_in,
                     neuron_type=neuron_model(),
                     label='neurons',
                     **ens_params)
-            nengo.Connection(self.c, self.neurons, synapse=None)
+            nengo.Connection(self.c, self.ens, synapse=None)
 
             ldn_a = nengo.Node(LDN(theta=self.theta, q=q_a, size_in=n_neurons), label='ldn_activities')
-            nengo.Connection(self.neurons.neurons, ldn_a, synapse=None)
+            nengo.Connection(self.ens.neurons, ldn_a, synapse=None)
 
             def llp_learning_rule(t, x):
                 """
@@ -204,7 +204,7 @@ class LLP(nengo.Network):
 
             # our current neural activity
             nengo.Connection(
-                self.neurons.neurons,
+                self.ens.neurons,
                 self.Z[-n_neurons:],
                 synapse=None)
 

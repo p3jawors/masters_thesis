@@ -5,11 +5,12 @@
         "dataset": "100_linear_targets",
         "state_key": "state_and_error",
         "ctrl_key": "clean_u",
-        "dataset_range": [0, 1000],
+        "dataset_range": [0, 40000],
         "c_dims": [12, 13, 14, 20],
         "z_dims": [12, 13, 14]
     },
    "llp": {
+        "model_type": "mine",
         "n_neurons": 2000,
         "theta": 1.0,
         "q": 8,

@@ -10,6 +10,7 @@
         "z_dims": [0]
     },
    "llp": {
+        "model_type": "mine",
         "n_neurons": 1000,
         "theta": 0.1,
         "q": 6,

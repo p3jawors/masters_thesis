@@ -13,6 +13,7 @@ Update to take in state and u data, avoid having to index into data
 import numpy as np
 import nengo
 from network import LLP
+from learn_dyn_sys.network import LearnDynSys
 
 def run_model(c_state, z_state, control, dt, record_activities=False, **llp_args):
 
@@ -33,18 +34,20 @@ def run_model(c_state, z_state, control, dt, record_activities=False, **llp_args
         n_pts = len(c_state)
         print(f"{n_pts=}")
 
-        llp = LLP(**llp_args)
-        #         n_neurons=n_neurons,
-        #         size_in=size_in,
-        #         size_out=len(z_dims), #  predict xyz
-        #         q_a=q_a,
-        #         q_p=q_p,
-        #         q=q,
-        #         theta=theta,
-        #         learning=True,
-        #         K=learning_rate,
-        #         radius=radius
-        # )
+        if llp_args['model_type'] == 'mine':
+            # scaling factor to better align with other model
+            llp_params['learning_rate'] *= dt
+            llp = LLP(**llp_args)
+        if llp_args['model_type'] == 'other':
+            llp = LearnDynSys(
+                size_c=llp_args['size_in'],
+                size_z=llp_args['size_out'],
+                q=llp_args['q'],
+                theta=llp_args['theta'],
+                n_neurons=llp_args['n_neurons'],
+                learning_rate=llp_args['learning_rate'],
+                neuron_type=llp_args['neuron_model']()
+            )
 
         def input_func(t):
             index = int((t-dt)/dt)
@@ -70,7 +73,7 @@ def run_model(c_state, z_state, control, dt, record_activities=False, **llp_args
 
         Z_probe = nengo.Probe(llp.Z, synapse=None)
         if record_activities:
-            activity_probe = nengo.Probe(llp.neurons.neurons, synapse=None)
+            activity_probe = nengo.Probe(llp.ens.neurons, synapse=None)
 
     sim = nengo.Simulator(model, dt=dt)
     with sim:

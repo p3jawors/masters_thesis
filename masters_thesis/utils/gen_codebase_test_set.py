@@ -17,7 +17,5 @@ def stim_func(t, freq=5):
 t = np.arange(0, 20, 0.01)
 state = np.asarray(stim_func(t)).T
 u = np.zeros(t.shape)
-print(state.shape)
-
 dat = DataHandler('codebase_test_set', 'data/databases')
 dat.save(save_location='sin5t', data={'time': t, 'state': state, 'control': u}, overwrite=True)

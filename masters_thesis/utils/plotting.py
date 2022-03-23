@@ -375,7 +375,7 @@ def traj_3d_gif(
     imageio.mimsave(
         f"{save_name}_{time_multiplier}x.gif",
         frames,
-        fps=120
+        # fps=120
         # duration=time[-1]/time_multiplier
     )#, time[-1]/time_multiplier)#'GIF', **kargs)
 
@@ -411,7 +411,7 @@ if __name__ == '__main__':
         parameters=['state', 'clean_u', 'time']
     )
 
-    # traj_3d_gif(data['state'], data['time'], save_name='100_linear_targets', time_multiplier=100, regen_figs=False)
+    # traj_3d_gif(data['state'], data['time'], save_name='100_linear_targets', time_multiplier=1, regen_figs=False)
     # plot_data_distribution(
     #     data['state'],
     #     dim_labels=['x', 'y', 'z', 'dx', 'dy', 'dz', 'a', 'b', 'g', 'da', 'db', 'dg']

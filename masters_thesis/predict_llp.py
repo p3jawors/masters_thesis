@@ -28,13 +28,15 @@ def run_model(c_state, z_state, control, dt, record_activities=False, **llp_args
     model = nengo.Network()
     with model:
         n_pts = len(c_state)
-        print(f"{n_pts=}")
 
         if llp_args['model_type'] == 'mine':
             # scaling factor to better align with other model
             llp_args['learning_rate'] *= dt
             del llp_args['model_type']
-            llp = LLP(**llp_args)
+            llp = LLP(
+                ens_params={'radius': np.sqrt(c_state.shape[1])},
+                **llp_args
+            )
         elif llp_args['model_type'] == 'other':
             llp = LearnDynSys(
                 size_c=llp_args['size_in'],
@@ -43,7 +45,8 @@ def run_model(c_state, z_state, control, dt, record_activities=False, **llp_args
                 theta=llp_args['theta'],
                 n_neurons=llp_args['n_neurons'],
                 learning_rate=llp_args['learning_rate'],
-                neuron_type=llp_args['neuron_model']()
+                neuron_type=llp_args['neuron_model'](),
+                ens_params={'radius': np.sqrt(c_state.shape[1])},
             )
 
         def input_func(t):

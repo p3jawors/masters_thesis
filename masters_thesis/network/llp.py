@@ -52,8 +52,11 @@ class LLP(nengo.Network):
     def __init__(
             self, n_neurons, size_in, size_out, q_a, q_p, q, theta,
             learning=True, decoders=None, learning_rate=0.0, verbose=False, theta_p=None,
-            neuron_model=nengo.LIFRate, **ens_params):
+            neuron_model=nengo.LIFRate, ens_params=None, **kwargs):
 
+        if ens_params is None:
+            # nengo default
+            ens_params = {'radius': 1}
         # if neuron_model is None:
         #     if verbose:
         #         print('Using default neuron model of nengo.LIFRate')

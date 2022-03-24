@@ -107,7 +107,7 @@ def decode_ldn_data(Z, q, theta, theta_p=None):
     # print(f"{transform.shape=}")
     zhat = []
     for _Z in tqdm(Z):
-        _Z = _Z.reshape((q, m))
+        _Z = _Z.reshape((m, q)).T
         zhat.append(np.dot(transform, _Z))
         # print(f"{_Z.shape=}")
 

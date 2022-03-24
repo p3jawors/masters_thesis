@@ -11,6 +11,16 @@ import numpy as np
 import matplotlib.pyplot as plt
 from abr_analyze import DataHandler
 
+def plot_thing(thing):
+    plt.figure(figsize=(12, 12))
+    for ii in range(0, min(thing.shape)):
+        plt.subplot(8, 3, ii+1)
+        plt.title(f"{labs[ii]}")
+        plt.plot(data['time'], thing.T[ii])
+        # plt.plot(data['state_and_error-max_0_1-normalized'].T[ii])
+    plt.show()
+
+
 view = False
 if len(sys.argv) > 1:
     view = sys.argv[1]
@@ -23,18 +33,26 @@ data = dat.load(
     save_location=train_data,
     parameters=dat.get_keys(train_data)#['state', 'target']
 )
-MULTIPLIER = 30
+MULTIPLIER = 1#30
 print('Available keys: ', dat.get_keys(train_data))
 print('State shape: ', data['state'].shape)
 print(' Target shape: ', data['target'].shape)
 state_err = MULTIPLIER * np.hstack((data['state'], np.subtract(data['target'], data['state'])))
 print('Stacked state-error shape: ', state_err.shape)
-data['state_and_error_30x'] = state_err
+# data['state_and_error_30x'] = state_err
 
 labs = [
     'x', 'y', 'z', 'dx', 'dy' , 'dz', 'a', 'b' , 'g', 'da', 'db', 'dg',
     'ex', 'ey', 'ez', 'edx', 'edy', 'edz', 'ea', 'eb' , 'eg', 'eda', 'edb', 'edg'
 ]
+new_state = np.empty(data['state'].shape)
+for ii in range(0, data['state'].shape[1]):
+    dim = data['state'][:, ii]
+    new_state[:, ii] = (dim - np.mean(dim))/np.amax(abs(dim-np.mean(dim)))
+
+data['mean_shift_abs_max_scale_state'] = new_state
+if view:
+    plot_thing(new_state)
 
 # max_err = 0.1
 # data['state_and_error-max_0_1-normalized'] = np.clip(
@@ -49,14 +67,6 @@ labs = [
 # print(np.linalg.norm(xyz_err/norm_err))
 # max_err = np.amax(xyz_err)
 # norm_err = xyz_err / max_err
-
-plt.figure(figsize=(12, 12))
-for ii in range(0, min(state_err.shape)):
-    plt.subplot(8, 3, ii+1)
-    plt.title(f"{labs[ii]}")
-    plt.plot(data['time'], state_err.T[ii])
-    # plt.plot(data['state_and_error-max_0_1-normalized'].T[ii])
-plt.show()
 
 
 

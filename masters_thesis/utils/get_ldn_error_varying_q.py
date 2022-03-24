@@ -13,35 +13,27 @@ from abr_analyze import DataHandler
 # z = data['state'][:, 0]
 # z = z[:, np.newaxis]
 
+n_steps = 10000
 db_name = 'llp_pd'
 dat = DataHandler(db_name, database_dir='data/databases')
 data = dat.load(save_location='train/param_set_0003', parameters=['activities', 'z'])
 act = data['activities']
 predicted_z = data['z']
 
-print('shape: ', act.shape)
-n_steps = 10000
-# z = predicted_z[:n_steps, :]
-z = predicted_z[:n_steps, 0]
-z = z[:, np.newaxis]
+z = predicted_z[:n_steps, :]
+output_labs = ['x', 'y', 'z']
 
-output_labs = None #['x', 'y', 'z']
-
-# z = act[:n_steps, 0]
+z = act[:n_steps, :2]
 # z = z[:, np.newaxis]
 # output_labs = ['neuron0']
+output_labs = None
 
 dt = 0.01
 label = 'activity_repr'
-# T = 5
-# t = np.arange(0, T, dt)
-# F = 1
-# z = np.sin(F * t*(np.pi*2))
-# z = z[: , np.newaxis]
 
-qvals = [10]
-theta = 0.1
-theta_p = [0.1]
+qvals = [50]
+theta = 1
+theta_p = [1]
 error, zhats = calc_ldn_repr_err(z, qvals, theta, theta_p, dt=dt, return_zhat=True)
 # TODO update this to subplot based on m dimensionality (n outputs)
 plotting.plot_ldn_repr_error(error, theta, theta_p, z, dt, zhats, output_labs, label)

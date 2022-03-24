@@ -1,7 +1,3 @@
-# TODO update to save figures in data/figures folder
-# import matplotlib
-# matplotlib.use('TkAgg')
-
 from tqdm import tqdm
 import imageio
 import matplotlib.pyplot as plt
@@ -45,6 +41,7 @@ def plot_pred(
             axs[ii].plot(time-pred, z.T[ii], linestyle='--')
             axs[ii].plot(time, z.T[ii], linestyle='-')
             # axs[ii].plot(time, z.T[ii], linestyle='--')
+            axs[ii].set_ylim(2*np.amin(z.T[ii]), 2*np.amax(z.T[ii]))
 
         axs[ii].legend(
             [f'{labels[ii]}hat at: ' + str(round(tp, 3)) for tp in theta_p]
@@ -226,7 +223,7 @@ def plot_error(theta_p, errors, dt, output_labs=('X', 'Y', 'Z'), theta=None, sav
     if not save:
         plt.show()
 
-def plot_ldn_repr_error(error, theta, theta_p, z, dt, zhats, output_labs=('X', 'Y', 'Z'), label=None, folder='Figures', max_rows=4):
+def plot_ldn_repr_error(error, theta, theta_p, z, dt, zhats, output_labs=None, label=None, folder='Figures', max_rows=4):
     """
     Parameters
     ----------
@@ -285,13 +282,15 @@ def plot_ldn_repr_error(error, theta, theta_p, z, dt, zhats, output_labs=('X', '
                 plt.xlabel('Time [sec]')
         plt.savefig(f"{folder}/{label}_q={key}-tp={theta_p[ii]}.jpg")
 
+        if output_labs is None:
+            output_labs = np.arange(0, z.shape[0])
         plot_error(
             theta_p=theta_p, errors=error[key], dt=dt, output_labs=output_labs,
             theta=theta, save=True, label=f"q={key}_")
 
 def traj_3d_gif(
         dat_arr, time, save_name, sec_between_data_captures=1, tail_len=5,
-        time_multiplier=10, flip_z=True, regen_figs=True):
+        time_multiplier=10, flip_z=True, regen_figs=True, folder='Figures'):
     """
     Parameters
     ----------
@@ -313,6 +312,8 @@ def traj_3d_gif(
         starts by clearing .cache then generates figures to create gif
         if False will read figures from file in the .cache
     """
+    if not os.path.exists(folder):
+        os.makedirs(folder)
     if not os.path.exists('.cache'):
         os.makedirs('.cache')
     if regen_figs:
@@ -385,7 +386,7 @@ def traj_3d_gif(
     # Save them as frames into a gif
     kargs = { 'duration': time[-1]/time_multiplier }
     imageio.mimsave(
-        f"{save_name}_{time_multiplier}x.gif",
+        f"{folder}/{save_name}_{time_multiplier}x.gif",
         frames,
         # fps=120
         # duration=time[-1]/time_multiplier

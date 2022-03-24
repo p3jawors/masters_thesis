@@ -6,10 +6,6 @@ Activities can be optionally saved with the record_activities param.
 
 Returns dictionary of predictions Z
 """
-#TODO
-"""
-Update to take in state and u data, avoid having to index into data
-"""
 import numpy as np
 import nengo
 from network import LLP
@@ -36,9 +32,10 @@ def run_model(c_state, z_state, control, dt, record_activities=False, **llp_args
 
         if llp_args['model_type'] == 'mine':
             # scaling factor to better align with other model
-            llp_params['learning_rate'] *= dt
+            llp_args['learning_rate'] *= dt
+            del llp_args['model_type']
             llp = LLP(**llp_args)
-        if llp_args['model_type'] == 'other':
+        elif llp_args['model_type'] == 'other':
             llp = LearnDynSys(
                 size_c=llp_args['size_in'],
                 size_z=llp_args['size_out'],

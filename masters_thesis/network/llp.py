@@ -72,9 +72,12 @@ class LLP(nengo.Network):
         QS = np.einsum("qapr, Rr->qapr", Q, S)
         d = self.generate_delta_identity(q_a, q_r)
 
+        # print("\n\n\nCHECK RESHAPING OF A, M, and Q IN LLP\n\n\n")
+        print("\n\n\nTRY DIFFERENT INIAL WEIGHTS FOR LLP\n\n\n")
         shapes = {
                 'A': (n_neurons, q_a),
-                'M': (q_p, size_out, q),
+                # 'M': (q_p, size_out, q),
+                'M': (size_out, q, q_p),
                 'Q': (q_a, q, q_p, q_r),
                 'S': (q_r, q_r),
                 'z': size_out,
@@ -162,7 +165,8 @@ class LLP(nengo.Network):
                     z = x[sizes['A']+sizes['M'] : sizes['A']+sizes['M']+sizes['z']]
 
                     zd = np.einsum("m, ar->mar", z, d)
-                    MQS = np.einsum("pmq, qapr->mar", M, QS)
+                    # MQS = np.einsum("pmq, qapr->mar", M, QS)
+                    MQS = np.einsum("mqp, qapr->mar", M, QS)
                     error = np.subtract(MQS,  zd)
                     dD = -learning_rate * np.einsum("Na, mar->Nrm", A, error)
                     self.decoders += dD

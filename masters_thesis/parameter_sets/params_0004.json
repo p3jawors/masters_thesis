@@ -6,17 +6,17 @@
         "state_key": "mean_shift_abs_max_scale_state",
         "ctrl_key": "clean_u",
         "dataset_range": [0, 5000],
-        "c_dims": [0, 1, 2, 3, 4, 5, 8],
-        "z_dims": [0, 1, 2],
-        "u_dims": [0, 1, 2, 3]
+        "c_dims": [0, 3],
+        "z_dims": [0],
+        "u_dims": []
     },
    "llp": {
         "model_type": "mine",
-        "n_neurons": 2000,
-        "theta": 0.1,
-        "q": 10,
-        "q_a": 50,
-        "q_p": 10,
+        "n_neurons": 3000,
+        "theta": 1,
+        "q": 4,
+        "q_a": 150,
+        "q_p": 5,
         "learning_rate": 0.000005,
         "neuron_model": "nengo.LIFRate"
     },
@@ -24,6 +24,6 @@
         "run_nni": false,
         "dt": 0.01,
         "seed": 47,
-        "theta_p": [0.1]
+        "theta_p": [1]
     }
 }

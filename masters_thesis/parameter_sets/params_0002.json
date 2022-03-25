@@ -7,7 +7,8 @@
         "ctrl_key": "control",
         "dataset_range": [0, -1],
         "c_dims": [0, 1],
-        "z_dims": [0]
+        "z_dims": [0],
+        "u_dims": []
     },
    "llp": {
         "model_type": "mine",

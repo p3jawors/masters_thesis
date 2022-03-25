@@ -18,9 +18,9 @@ class LLP(nengo.Network):
     ----------
     n_neurons: int
         the number of neurons to predict the legendre coefficients
-    size_in: int
+    size_c: int
         the dimensionality of the context signal
-    size_out: int
+    size_z: int
         the dimensionality of the context signal to be predicted
     q: int
         number of legendre polynomials for the prediction
@@ -50,17 +50,12 @@ class LLP(nengo.Network):
     """
 
     def __init__(
-            self, n_neurons, size_in, size_out, q_a, q_p, q, theta,
+            self, n_neurons, size_c, size_z, q_a, q_p, q, theta,
             learning=True, decoders=None, learning_rate=0.0, verbose=False, theta_p=None,
             neuron_model=nengo.LIFRate, ens_params=None, **kwargs):
 
         if ens_params is None:
-            # nengo default
             ens_params = {'radius': 1}
-        # if neuron_model is None:
-        #     if verbose:
-        #         print('Using default neuron model of nengo.LIFRate')
-        #     neuron_model = nengo.LIFRate
 
         self.theta = theta
         # if learning_rate != 0.0:
@@ -80,16 +75,16 @@ class LLP(nengo.Network):
         shapes = {
                 'A': (n_neurons, q_a),
                 # 'M': (q_p, size_out, q),
-                'M': (size_out, q, q_p),
+                'M': (size_z, q, q_p),
                 'Q': (q_a, q, q_p, q_r),
                 'S': (q_r, q_r),
-                'z': size_out,
-                'Z': (size_out, q),
+                'z': size_z,
+                'Z': (size_z, q),
                 'd': (q_a, q_r),
                 'QS': (q, q_a, q_p, q_r),
-                'MQS': (q_a, size_out, q_r),
-                'zd': (q_a, q_r, size_out),
-                'D': (n_neurons, q_r, size_out),
+                'MQS': (q_a, size_z, q_r),
+                'zd': (q_a, q_r, size_z),
+                'D': (n_neurons, q_r, size_z),
         }
         if verbose:
             print("---SHAPES---")
@@ -108,25 +103,31 @@ class LLP(nengo.Network):
         model = nengo.Network()
         if decoders is None:
             print('No decoders passed in, starting from zeros')
-            self.decoders = np.zeros((n_neurons, q, size_out))
+            self.decoders = np.zeros((n_neurons, q, size_z))
         else:
             self.decoders = decoders
 
         with model:
             # Our context, and state we are predicting the future window of
-            self.c = nengo.Node(size_in=size_in, size_out=size_in, label='c')
-            self.z = nengo.Node(size_in=size_out, size_out=size_out, label='z')
+            self.c = nengo.Node(size_in=size_c, size_out=size_c, label='c')
+            self.z = nengo.Node(size_in=size_z, size_out=size_z, label='z')
 
             # Our neurons that will predict the future on their output connections
             self.ens = nengo.Ensemble(
                     n_neurons=n_neurons,
-                    dimensions=size_in,
+                    dimensions=size_c,
                     neuron_type=neuron_model(),
                     label='neurons',
                     **ens_params)
             nengo.Connection(self.c, self.ens, synapse=None)
 
-            ldn_a = nengo.Node(LDN(theta=self.theta, q=q_a, size_in=n_neurons), label='ldn_activities')
+            ldn_a = nengo.Node(
+                LDN(
+                    theta=self.theta,
+                    q=q_a,
+                    size_in=n_neurons),
+                label='ldn_activities'
+            )
             nengo.Connection(self.ens.neurons, ldn_a, synapse=None)
 
             def llp_learning_rule(t, x):
@@ -187,7 +188,7 @@ class LLP(nengo.Network):
 
             # store our predictions in an LDN for use in the learning rule
             # this is an ldn storing the values of an ldn
-            ldn_Z = nengo.Node(LDN(theta=self.theta, q=q_p, size_in=q*size_out), label='ldn_Z')
+            ldn_Z = nengo.Node(LDN(theta=self.theta, q=q_p, size_in=q*size_z), label='ldn_Z')
             nengo.Connection(self.Z, ldn_Z, synapse=None)
 
             # == Input to learning rule ==
@@ -218,8 +219,8 @@ class LLP(nengo.Network):
 
             # For convenience, can output the legendre decoded output at various theta_p values
             if theta_p is not None:
-                self.zhat = nengo.Node(size_out=size_out*len(theta_p), size_in=size_out*len(theta_p))
-                for ii in range(0, size_out):
+                self.zhat = nengo.Node(size_out=size_z*len(theta_p), size_in=size_z*len(theta_p))
+                for ii in range(0, size_z):
                     nengo.Connection(
                         self.Z[ii*q_p:(ii+1)*q_p], self.zhat[ii*len(theta_p):(ii+1)*len(theta_p)],
                         transform=LDN(theta=self.theta, q=q_p, size_in=1).get_weights_for_delays(

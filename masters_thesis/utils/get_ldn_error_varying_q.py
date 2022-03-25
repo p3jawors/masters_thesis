@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from masters_thesis.utils import plotting
 from abr_analyze import DataHandler
+import sys
 
 # dat = DataHandler('codebase_test_set', 'data/databases')
 # data = dat.load(save_location='sin5t', parameters=['time', 'state'])
@@ -16,24 +17,42 @@ from abr_analyze import DataHandler
 n_steps = 10000
 db_name = 'llp_pd'
 dat = DataHandler(db_name, database_dir='data/databases')
-data = dat.load(save_location='train/param_set_0003', parameters=['activities', 'z'])
+data = dat.load(save_location='train/param_set_0003', parameters=['activities', 'Z', 'q'])
 act = data['activities']
-predicted_z = data['z']
+predicted_z = data['Z']
+q = data['q']
 
-z = predicted_z[:n_steps, :]
-output_labs = ['x', 'y', 'z']
+data2 = dat.load(save_location='100_linear_targets', parameters=['state'])
+state = data2['state']
 
-z = act[:n_steps, :2]
-# z = z[:, np.newaxis]
-# output_labs = ['neuron0']
-output_labs = None
+to_show = 'activities'
+if len(sys.argv) > 1:
+    to_show = str(sys.argv[1])
 
 dt = 0.01
-label = 'activity_repr'
-
-qvals = [50]
 theta = 1
 theta_p = [1]
+
+if to_show in ['Z', 'prediction']:
+    z = predicted_z[:n_steps, :]
+    output_labs = []
+    for jj in ['x', 'y', 'z']:
+        for ii in range(0, q):
+            output_labs.append(f"{jj}_{ii}")
+    label = 'LDN of Prediction'
+    qvals = [5]
+
+elif to_show in ['act', 'activites', 'neurons', 'spikes']:
+    z = act[:n_steps, :3]
+    output_labs = ['neuron0', 'neuron1', 'neuron2']
+    label = 'Neural Activities'
+    qvals = [150]
+
+elif to_show in ['state', 'context', 'c']:
+    z = state[:n_steps, :3]
+    output_labs = ['x', 'y', 'z']
+    label = 'Input Context and GT'
+    qvals = [4]
+
 error, zhats = calc_ldn_repr_err(z, qvals, theta, theta_p, dt=dt, return_zhat=True)
-# TODO update this to subplot based on m dimensionality (n outputs)
 plotting.plot_ldn_repr_error(error, theta, theta_p, z, dt, zhats, output_labs, label)

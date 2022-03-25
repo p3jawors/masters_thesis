@@ -11,7 +11,7 @@ import nengo
 from network import LLP
 from learn_dyn_sys.network import LearnDynSys
 
-def run_model(c_state, z_state, control, dt, record_activities=False, **llp_args):
+def run_model(c_state, z_state, dt, record_activities=False, **llp_args):
 
     # dt, n_neurons, size_in, q, q_a, q_p, theta, learning_rate, radius,
     # seed, state_data, control_data, record_activities=False):
@@ -22,8 +22,8 @@ def run_model(c_state, z_state, control, dt, record_activities=False, **llp_args
         c_state = c_state[:, np.newaxis]
     if z_state.ndim == 1:
         z_state = z_state[:, np.newaxis]
-    if control.ndim == 1:
-        control = control[:, np.newaxis]
+    # if control.ndim == 1:
+    #     control = control[:, np.newaxis]
 
     model = nengo.Network()
     with model:
@@ -39,8 +39,8 @@ def run_model(c_state, z_state, control, dt, record_activities=False, **llp_args
             )
         elif llp_args['model_type'] == 'other':
             llp = LearnDynSys(
-                size_c=llp_args['size_in'],
-                size_z=llp_args['size_out'],
+                size_c=llp_args['size_c'],
+                size_z=llp_args['size_z'],
                 q=llp_args['q'],
                 theta=llp_args['theta'],
                 n_neurons=llp_args['n_neurons'],
@@ -51,13 +51,15 @@ def run_model(c_state, z_state, control, dt, record_activities=False, **llp_args
 
         def input_func(t):
             index = int((t-dt)/dt)
-            state = c_state[index]
-            u = control[index]
-            c = np.hstack((state, u)).tolist()
+            # state = c_state[index]
+            # u = control[index]
+            # c = np.hstack((state, u)).tolist()
+            c = c_state[index]
             return c
 
         input_node = nengo.Node(
-            input_func, size_out=c_state.shape[1]+control.shape[1], label='c node')
+            # input_func, size_out=c_state.shape[1]+control.shape[1], label='c node')
+            input_func, size_out=c_state.shape[1], label='c node')
 
         nengo.Connection(input_node, llp.c, synapse=None)
 

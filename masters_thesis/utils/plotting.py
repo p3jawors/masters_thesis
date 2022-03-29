@@ -189,14 +189,14 @@ def plot_error(theta_p, errors, dt, output_labs=('X', 'Y', 'Z'), theta=None, sav
         for tp, _theta_p in enumerate(theta_p):
             alpha = 1 - tp/len(theta_p)
             if ii < errors.shape[2]:
-                plt.title("Error over Time, Varying Theta_p")
-                plt.xlabel('Time [sec]')
-                plt.ylabel(f'{output_labs[ii]} Mean Error Over Theta_P')
+                axs[ii].set_title("Error over Time, Varying Theta_p")
+                axs[ii].set_xlabel('Time [sec]')
+                axs[ii].set_ylabel(f'{output_labs[ii]} Mean Error Over Theta_P')
                 axs[ii].plot(time, errors[:, tp, ii], alpha=alpha, label=f"{_theta_p}")#, c='r')
             else:
-                plt.title("Error over Time")
-                plt.xlabel('Time [sec]')
-                plt.ylabel(f'2norm Error of Mean Over Theta_P')
+                axs[ii].set_title("Error over Time")
+                axs[ii].set_xlabel('Time [sec]')
+                axs[ii].set_ylabel(f'2norm Error of Mean Over Theta_P')
                 # axs[ii].plot(time, np.linalg.norm(np.mean(errors, axis=1), axis=1))
                 axs[ii].plot(time, np.linalg.norm(errors[:, tp, :], axis=1), alpha=alpha, label=f"{_theta_p}")#, c='r')
         plt.legend(loc=1)
@@ -287,6 +287,45 @@ def plot_ldn_repr_error(error, theta, theta_p, z, dt, zhats, output_labs=None, l
         plot_error(
             theta_p=theta_p, errors=error[key], dt=dt, output_labs=output_labs,
             theta=theta, save=True, label=f"q={key}_")
+
+
+def plot_traj_error(time, state, targets, save_name=None):
+    plt.figure(figsize=(10, 12))
+    plt.subplot(411)
+    plt.title('Trajectory Error with Path Planner (XYZ)')
+    plt.ylabel('2norm error [m]')
+    plt.xlabel('Time [sec]')
+    error = []
+    for ii in range(0, state.shape[0]):
+        error.append(np.linalg.norm((targets[ii, :3]-state[ii, :3])))
+    error = np.array(error)
+    plt.plot(time, error, label=f"Avg Error={np.mean(error)}")
+    plt.legend()
+    plt.subplot(412)
+    plt.title('X Trajectory')
+    plt.ylabel('X Position [m]')
+    plt.xlabel('Time [sec]')
+    plt.plot(time, state[:, 0], c='k', label='state')
+    plt.plot(time, targets[:, 0], linestyle='--', c='y', label='path')
+    plt.legend()
+    plt.subplot(413)
+    plt.title('Y Trajectory')
+    plt.ylabel('Y Position [m]')
+    plt.xlabel('Time [sec]')
+    plt.plot(time, state[:, 1], c='k', label='state')
+    plt.plot(time, targets[:, 1], linestyle='--', c='y', label='path')
+    plt.legend()
+    plt.subplot(414)
+    plt.title('Z Trajectory')
+    plt.ylabel('Z Position [m]')
+    plt.xlabel('Time [sec]')
+    plt.plot(time, state[:, 2], c='k', label='state')
+    plt.plot(time, targets[:, 2], linestyle='--', c='y', label='path')
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig('100_linear_targets_traj_error.png')
+    plt.show()
+
 
 def traj_3d_gif(
         dat_arr, time, save_name, sec_between_data_captures=1, tail_len=5,
@@ -416,13 +455,18 @@ def plot_data_distribution(dat_arr, dim_labels=None, bins=None, n_rows=4):
 
 if __name__ == '__main__':
     from abr_analyze import DataHandler
-    # dat = DataHandler('codebase_test_set', 'data/databases')
+
     dat = DataHandler('llp_pd', 'data/databases')
-    # dat.load('100_linear_targts', ['state', 'ctrl'])
-    data = dat.load(
-        save_location='100_linear_targets',
-        parameters=['state', 'clean_u', 'time']
-    )
+    data = dat.load(save_location='100_linear_targets', parameters=['state', 'target', 'time'])
+    plot_traj_error(data['time'], data['state'], data['target'])
+
+    # dat = DataHandler('codebase_test_set', 'data/databases')
+    # dat = DataHandler('llp_pd', 'data/databases')
+    # # dat.load('100_linear_targts', ['state', 'ctrl'])
+    # data = dat.load(
+    #     save_location='100_linear_targets',
+    #     parameters=['state', 'clean_u', 'time']
+    # )
 
     # traj_3d_gif(data['state'], data['time'], save_name='100_linear_targets', time_multiplier=1, regen_figs=False)
     # plot_data_distribution(

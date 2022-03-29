@@ -134,13 +134,15 @@ if len(sys.argv)>1:
     n_targets = int(sys.argv[1])
 else:
     n_targets = 100
+
+np.random.seed(n_targets)
 print(f"Collecting data for {n_targets} target reach")
 
 airsim_dt = 0.01
-save_location = '100_linear_targets_faster_0001'
+save_location = f'{n_targets}_linear_targets_faster'
 notes = (
 """
-- recording activities now, otherwise same as 100_linear_targets_faster
+-max_v=6, acc=3
 """
 )
 
@@ -269,7 +271,7 @@ except ExitSim as e:
     print('Exiting Sim')
 
 finally:
-    dat = DataHandler('llp_pd')
+    dat = DataHandler('llp_pd', 'data/databases')
     data = {}
     for key, val in probes.items():
         data[key] = sim.data[val]

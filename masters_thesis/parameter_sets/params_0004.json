@@ -5,7 +5,7 @@
         "dataset": "100_linear_targets",
         "state_key": "mean_shift_abs_max_scale_state",
         "ctrl_key": "clean_u",
-        "dataset_range": [0, 5000],
+        "dataset_range": [0, 20000],
         "c_dims": [0, 3],
         "z_dims": [0],
         "u_dims": []

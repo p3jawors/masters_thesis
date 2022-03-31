@@ -81,7 +81,7 @@ def plot_pred(
                 os.remove(filename)
     plt.show()
 
-def plot_error(theta_p, errors, dt, output_labs=('X', 'Y', 'Z'), theta=None, save=False, label='', folder='Figures'):
+def plot_error(theta_p, errors, dt, prediction_dim_labs=('X', 'Y', 'Z'), theta=None, save=False, label='', folder='Figures'):
     """
     Parameters
     ----------
@@ -107,10 +107,9 @@ def plot_error(theta_p, errors, dt, output_labs=('X', 'Y', 'Z'), theta=None, sav
             plt.subplot(len(theta_p), 1, ii+1)
             plt.title(f"{theta_p[ii]} prediction 2norm error")
             plt.plot(errors[:, ii, :])
-        plt.show()
-
         if save:
-            plt.savefig(f'{folder}/{label}2norm_over_time.jpg')
+            plt.savefig(f'{folder}{label}2norm_over_time.jpg')
+        plt.show()
 
     if len(theta_p) > 1:
         # Plot a 3d plot for each xyz output dim
@@ -121,7 +120,7 @@ def plot_error(theta_p, errors, dt, output_labs=('X', 'Y', 'Z'), theta=None, sav
             axs.append(plt.subplot(1, errors.shape[2], ii+1, projection='3d'))
             plt.xlabel('Time [sec]')
             plt.ylabel('Theta P [sec]')
-            plt.title(f'{output_labs[ii]} Error')
+            plt.title(f'{prediction_dim_labs[ii]} Error')
             X, Y = np.meshgrid(time, theta_p)
             surf = axs[ii].plot_surface(X, Y, errors[:, :, ii].T,
                     cmap=cm.coolwarm, linewidth=0, antialiased=False)
@@ -142,7 +141,7 @@ def plot_error(theta_p, errors, dt, output_labs=('X', 'Y', 'Z'), theta=None, sav
             if ii < errors.shape[2]:
                 plt.xlabel('Time [sec]')
                 plt.ylabel('Theta P [sec]')
-                plt.title(f'{output_labs[ii]} Error | theta={theta}')
+                plt.title(f'{prediction_dim_labs[ii]} Error | theta={theta}')
                 X, Y = np.meshgrid(time, theta_p)
                 axs[ii].pcolormesh(X, Y, errors[:, :, ii].T)
             else:
@@ -170,7 +169,7 @@ def plot_error(theta_p, errors, dt, output_labs=('X', 'Y', 'Z'), theta=None, sav
             if ii < errors.shape[2]:
                 plt.title("Error over Time")
                 plt.xlabel('Time [sec]')
-                plt.ylabel(f'{output_labs[ii]} Mean Error Over Theta_P')
+                plt.ylabel(f'{prediction_dim_labs[ii]} Mean Error Over Theta_P')
                 axs[ii].plot(time, np.mean(errors[:, :, ii], axis=1))
             else:
                 plt.title("Error over Time")
@@ -191,7 +190,7 @@ def plot_error(theta_p, errors, dt, output_labs=('X', 'Y', 'Z'), theta=None, sav
             if ii < errors.shape[2]:
                 axs[ii].set_title("Error over Time, Varying Theta_p")
                 axs[ii].set_xlabel('Time [sec]')
-                axs[ii].set_ylabel(f'{output_labs[ii]} Mean Error Over Theta_P')
+                axs[ii].set_ylabel(f'{prediction_dim_labs[ii]} Mean Error Over Theta_P')
                 axs[ii].plot(time, errors[:, tp, ii], alpha=alpha, label=f"{_theta_p}")#, c='r')
             else:
                 axs[ii].set_title("Error over Time")
@@ -214,7 +213,7 @@ def plot_error(theta_p, errors, dt, output_labs=('X', 'Y', 'Z'), theta=None, sav
             axs.append(plt.subplot(errors.shape[2], 1, ii+1))
             plt.title("Error over Theta_P")
             plt.xlabel('Theta_P [sec]')
-            plt.ylabel(f'{output_labs[ii]} Mean Error Over Time')
+            plt.ylabel(f'{prediction_dim_labs[ii]} Mean Error Over Time')
             axs[ii].plot(theta_p, np.mean(errors[:, :, ii], axis=0))
 
         if save:
@@ -223,7 +222,7 @@ def plot_error(theta_p, errors, dt, output_labs=('X', 'Y', 'Z'), theta=None, sav
     if not save:
         plt.show()
 
-def plot_ldn_repr_error(error, theta, theta_p, z, dt, zhats, output_labs=None, label=None, folder='Figures', max_rows=4):
+def plot_ldn_repr_error(error, theta, theta_p, z, dt, zhats, prediction_dim_labs=None, save_name=None, folder='data/figures/', max_rows=4, dim_labels=None):
     """
     Parameters
     ----------
@@ -250,8 +249,8 @@ def plot_ldn_repr_error(error, theta, theta_p, z, dt, zhats, output_labs=None, l
         return shifted_t
 
 
-    if label is None:
-        label = 'testfig'
+    if save_name is None:
+        save_name = 'testfig'
 
     for key in zhats:
         # output dimensionality in meat space
@@ -264,11 +263,13 @@ def plot_ldn_repr_error(error, theta, theta_p, z, dt, zhats, output_labs=None, l
     for key in error:
         # print(f"{key}: {error[key].shape}")
         for ii in range(0, len(theta_p)):
-            plt.figure(figsize=(12,9))
+            plt.figure(figsize=(int(jj)*4, 12))
             for ll in range(0, mm):
                 plt.subplot(jj, kk, ll+1)
 
-                plt.title(f"q={key} | theta_p={theta_p[ii]}")
+                plt.title(f"LDN Representation: q={key} | theta_p={theta_p[ii]}")
+                if dim_labels is not None:
+                    plt.ylabel(dim_labels[ll])
 
                 steps = z.shape[0]
                 shifted_t = get_shifted_t(theta_p[ii], dt, steps, direction='forward')
@@ -280,13 +281,38 @@ def plot_ldn_repr_error(error, theta, theta_p, z, dt, zhats, output_labs=None, l
                 plt.plot(t, zhats[key][:, ii, mm-1], label=f'zhat_{theta_p[ii]}', linestyle='--')
                 plt.legend(loc=1)
                 plt.xlabel('Time [sec]')
-        plt.savefig(f"{folder}/{label}_q={key}-tp={theta_p[ii]}.jpg")
+        plt.tight_layout()
+        plt.savefig(f"{folder}{save_name}_q={key}-tp={theta_p[ii]}.jpg")
+        plt.show()
 
-        if output_labs is None:
-            output_labs = np.arange(0, z.shape[0])
-        plot_error(
-            theta_p=theta_p, errors=error[key], dt=dt, output_labs=output_labs,
-            theta=theta, save=True, label=f"q={key}_")
+        # if prediction_dim_labs is None:
+        #     prediction_dim_labs = np.arange(0, z.shape[0])
+        # plot_error(
+        #     theta_p=theta_p, errors=error[key], dt=dt, prediction_dim_labs=prediction_dim_labs,
+        #     theta=theta, save=True, label=f"q={key}_")
+
+def plot_2d(time, dat_arr, labels=None, save_name=None, n_rows=4, title=None, show=True):
+    j = min(dat_arr.shape[1], n_rows)
+    k = int(np.ceil(dat_arr.shape[1]/j))
+    if labels is None:
+        labels = np.arange(0, dat_arr.shape[1])
+
+    plt.figure(figsize=(int(n_rows)*4, 12))
+
+    for ii in range(0, dat_arr.shape[1]):
+        plt.subplot(j, k, ii+1)
+        if title is not None:
+            plt.title(title)
+        plt.ylabel(labels[ii])
+        plt.xlabel('Time [sec]')
+        plt.plot(time, dat_arr[:, ii])
+
+    plt.tight_layout()
+
+    if save_name is not None:
+        plt.savefig(save_name)
+    if show:
+        plt.show()
 
 
 def plot_traj_error(time, state, targets, save_name=None):
@@ -340,7 +366,6 @@ def traj_3d_gif(
         the cumulative time [sec]
     sec_between_data_captures: float
         The time resolution to capture data frames at
-        This is the 
     fps: int
         frames per second of gif
     tail_len: float
@@ -431,26 +456,32 @@ def traj_3d_gif(
         # duration=time[-1]/time_multiplier
     )#, time[-1]/time_multiplier)#'GIF', **kargs)
 
-def plot_data_distribution(dat_arr, dim_labels=None, bins=None, n_rows=4):
+def plot_data_distribution(dat_arr, dim_labels=None, bins=None, n_rows=4, save_name=None, show=True, title=None):
     if bins is None:
-        bins = [0, 0.150]
+        bins = 20
 
     j = min(dat_arr.shape[1], n_rows)
     k = int(np.ceil(dat_arr.shape[1]/j))
-    plt.figure()
+    plt.figure(figsize=(int(n_rows)*4, 12))
     for ii in range(0, dat_arr.shape[1]):
         plt.subplot(j, k, ii+1)
+        if title is not None:
+            plt.title(title)
         a = dat_arr[:, ii]
-        _ = plt.hist(a, bins='auto')  # arguments are passed to np.histogram
+        _ = plt.hist(a, bins=bins)#'auto')  # arguments are passed to np.histogram
         # plt.title("Histogram with 'auto' bins")
         if dim_labels is not None:
-            plt.title(f"{dim_labels[ii]}")
+            plt.ylabel(f"{dim_labels[ii]}")
         else:
-            plt.title(f"{ii}")
+            plt.ylabel(f"{ii}")
         # hist, bin_edges = np.histogram(a)#, bins=bins)
         # plt.hist(hist, bin_edges)
-    plt.show()
+    plt.tight_layout()
 
+    if save_name is not None:
+        plt.savefig(save_name)
+    if show:
+        plt.show()
 
 
 if __name__ == '__main__':
@@ -460,6 +491,13 @@ if __name__ == '__main__':
     data = dat.load(save_location='100_linear_targets', parameters=['state', 'target', 'time'])
     plot_traj_error(data['time'], data['state'], data['target'])
 
+    # plot_2d(
+    #     data['time'],
+    #     data['state'],
+    #     labels=['x', 'y', 'z', 'dx', 'dy', 'dz', 'a', 'b', 'g', 'da', 'db', 'dg'],
+    #     save_name=None,
+    #     n_rows=4
+    # )
     # dat = DataHandler('codebase_test_set', 'data/databases')
     # dat = DataHandler('llp_pd', 'data/databases')
     # # dat.load('100_linear_targts', ['state', 'ctrl'])

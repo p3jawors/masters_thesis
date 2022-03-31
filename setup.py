@@ -14,7 +14,7 @@ install_requires = [
     "nengo>=2.8.0",
     "nengo_extras>=0.3.0"
     "h5py==2.8.0",
-    "nni>=2.6.0
+    "nni>=2.6.0"
     ]
 
 setuptools.setup(

@@ -6,7 +6,7 @@
         "state_key": "state",
         "ctrl_key": "control",
         "dataset_range": [0, -1],
-        "c_dims": [0, 1],
+        "c_dims": [0],
         "z_dims": [0],
         "u_dims": []
     },

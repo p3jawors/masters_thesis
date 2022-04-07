@@ -270,3 +270,24 @@ def RMSP(x_t, T, des_rmsp=None, debug=False, dt=0.001):
         scale = des_rmsp / rmsp
         return rmsp, scale
     return rmsp, 1
+
+def clipOutliers(arr, outlierConstant=1.7):
+    """
+    Default of 1.7 gives 3 sigma for normally distributed data
+    """
+    #<script src="https://gist.github.com/vishalkuo/f4aec300cf6252ed28d3.js"></script>
+    clean_arr = np.empty(arr.shape)
+    assert arr.shape[0] > arr.shape[1], ("Time should be the 0th dimension")
+
+    for ii in range(0, arr.shape[1]):
+        upper_quartile = np.percentile(arr[:, ii], 75)
+        lower_quartile = np.percentile(arr[:, ii], 25)
+        IQR = (upper_quartile - lower_quartile) * outlierConstant
+        quartileSet = (lower_quartile - IQR, upper_quartile + IQR)
+        clean_arr[:, ii] = np.clip(arr[:, ii], quartileSet[1], quartileSet[0])
+        # resultList = []
+        # for y in a.tolist():
+        #     if y >= quartileSet[0] and y <= quartileSet[1]:
+        #         resultList.append(y)
+        # return resultList
+    return clean_arr

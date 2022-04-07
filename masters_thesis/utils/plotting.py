@@ -8,7 +8,7 @@ import os
 import numpy as np
 
 def plot_pred(
-        time, z, zhat, theta_p, size_out, gif_name, animate=True, window=None,
+        time, z, zhat, theta_p, size_out, gif_name='gif', animate=True, window=None,
         step=None, save=False, folder='Figures'):
 
     if not os.path.exists(folder):
@@ -34,20 +34,23 @@ def plot_pred(
     labels = ['x', 'y', 'z']
     for ii in range(0, size_out):
         axs.append(plt.subplot(size_out, 1, ii+1))
-        axs[ii].plot(time, np.squeeze(zhat[:, :, ii]))
+        axs[ii].plot(time, z.T[ii], 'k', linestyle='-', label=f"{labels[ii]}(t)")
+
+        for pred in theta_p:
+            axs[ii].plot(time-pred, z.T[ii], linestyle='-', label=f"{labels[ii]}(t+{pred})")
 
         plt.gca().set_prop_cycle(None)
-        for pred in theta_p:
-            axs[ii].plot(time-pred, z.T[ii], linestyle='--')
-            axs[ii].plot(time, z.T[ii], linestyle='-')
+        for pp, pred in enumerate(theta_p):
+            axs[ii].plot(time, np.squeeze(zhat[:, pp, ii]), linestyle='--', label=f"{labels[ii]}(t, {pred})")
             # axs[ii].plot(time, z.T[ii], linestyle='--')
             axs[ii].set_ylim(2*np.amin(z.T[ii]), 2*np.amax(z.T[ii]))
 
-        axs[ii].legend(
-            [f'{labels[ii]}hat at: ' + str(round(tp, 3)) for tp in theta_p]
-            + [f'{labels[ii]} shifted: ' + str(round(tp, 3)) for tp in theta_p]
-            + [f'{labels[ii]} actual: ' + str(round(tp, 3)) for tp in theta_p],
-            loc=1)
+        # axs[ii].legend(
+        #     f'{labels[ii]}(t)'
+        #     + [f'{labels[ii]}hat(t, ' + str(round(tp, 3)) for tp in theta_p + ')']
+        #     + [f'{labels[ii]}(t+' + str(round(tp, 3)) for tp in theta_p + ')'],
+        #     loc=1)
+        axs[ii].legend(loc=1)
     if save:
         plt.savefig(f'{folder}/llp_prediction_over_time.jpg')
 
@@ -276,9 +279,9 @@ def plot_ldn_repr_error(error, theta, theta_p, z, dt, zhats, prediction_dim_labs
                 t = np.arange(0, z.shape[0]*dt, dt)
 
                 # plt.plot(t, error[key][:, ii, mm-1], label=f'error_{theta_p[ii]}')
-                plt.plot(t, z[:, mm-1], label='z')
-                plt.plot(shifted_t, z[:, mm-1], label=f'z shift>>{theta_p[ii]}')
-                plt.plot(t, zhats[key][:, ii, mm-1], label=f'zhat_{theta_p[ii]}', linestyle='--')
+                plt.plot(t, z[:, ll-1], label='z')
+                plt.plot(shifted_t, z[:, ll-1], label=f'z shift>>{theta_p[ii]}')
+                plt.plot(t, zhats[key][:, ii, ll-1], label=f'zhat_{theta_p[ii]}', linestyle='--')
                 plt.legend(loc=1)
                 plt.xlabel('Time [sec]')
         plt.tight_layout()

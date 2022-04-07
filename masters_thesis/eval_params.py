@@ -5,15 +5,17 @@ import nengo
 import sys
 
 from abr_analyze import DataHandler
-from masters_thesis.utils.eval_utils import decode_ldn_data, calc_shifted_error, calc_nni_err
+from masters_thesis.utils.eval_utils import decode_ldn_data, calc_shifted_error
 from masters_thesis.utils.plotting import plot_pred, plot_error
 import predict_llp
+
+# TODO update eval so we can have separate db for train data and results
 
 folder = 'data/figures/'
 if not os.path.exists(folder):
     os.makedirs(folder)
 
-def run(json_params, param_id, load_results=False):
+def run(json_params, param_id, load_results=False, save=False, plot=True):
     # split into separate dicts for easier use
     data_params = json_params['data']
     llp_params = json_params['llp']
@@ -25,10 +27,15 @@ def run(json_params, param_id, load_results=False):
         llp_params['neuron_model'] = nengo.LIFRate
     elif llp_params['neuron_model'] == 'nengo.LifRectifiedLinear':
         llp_params['neuron_model'] = nengo.LIFRectifiedLinear
+    elif llp_params['neuron_model'] == 'nengo.RectifiedLinear':
+        llp_params['neuron_model'] = nengo.RectifiedLinear
     else:
         raise ValueError(f"{llp_params['neuron_model']} is not a valid neuron model")
 
     # Load training data
+    if data_params['database_dir'] == '':
+        data_params['database_dir'] = None
+
     dat = DataHandler(data_params['db_name'], data_params['database_dir'])
     data = dat.load(
         save_location=data_params['dataset'],
@@ -99,24 +106,16 @@ def run(json_params, param_id, load_results=False):
         theta_p=params['theta_p']
     )
 
-    if params['run_nni']:
-        nni_error = calc_nni_err(errors)
-        return nni_error
-    else:
         # save params to the json name
-        if not load_results:
-            dat.save(
-                save_location=f"eval/{param_id}/results",
-                data=results,
-                overwrite=True
-            )
-            json_params['llp']['neuron_model'] = model_str
-            dat.save(
-                save_location=f"eval/{param_id}/params",
-                data=json_params,
-                overwrite=True
-            )
+    if save:
+        dat.save(
+            save_location=f"eval/{param_id}/results",
+            data=results,
+            overwrite=True
+        )
+        print(f"Saved data to eval/{param_id}/results of {data_params['db_name']} database located in folder {data_params['database_dir']}")
 
+    if plot:
         plot_error(theta_p=params['theta_p'], errors=errors, dt=params['dt'])
 
         plot_pred(
@@ -129,6 +128,8 @@ def run(json_params, param_id, load_results=False):
             animate=False
         )
 
+    return errors, results
+
 if __name__ == '__main__':
     # load in all parameters
     with open(sys.argv[1]) as fp:
@@ -138,5 +139,5 @@ if __name__ == '__main__':
     load_results = False
     if len(sys.argv) > 2:
         load_results = bool(sys.argv[2])
-    run(json_params, param_id, load_results)
+    run(json_params, param_id, load_results, save=True)
 

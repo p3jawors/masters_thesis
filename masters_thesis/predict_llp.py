@@ -46,7 +46,7 @@ def run_model(c_state, z_state, dt, record_activities=False, **llp_args):
                 n_neurons=llp_args['n_neurons'],
                 learning_rate=llp_args['learning_rate'],
                 neuron_type=llp_args['neuron_model'](),
-                ens_params={'radius': np.sqrt(c_state.shape[1])},
+                **{'radius': np.sqrt(c_state.shape[1])},
             )
 
         def input_func(t):

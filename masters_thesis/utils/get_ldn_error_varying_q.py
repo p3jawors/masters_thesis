@@ -35,24 +35,52 @@ theta_p = [1]
 
 if to_show in ['Z', 'prediction']:
     z = predicted_z[:n_steps, :]
-    output_labs = []
+    prediction_dim_labs = []
     for jj in ['x', 'y', 'z']:
         for ii in range(0, q):
-            output_labs.append(f"{jj}_{ii}")
+            prediction_dim_labs.append(f"{jj}_{ii}")
     label = 'LDN of Prediction'
     qvals = [5]
+    error, zhats = calc_ldn_repr_err(
+        z, qvals, theta, theta_p, dt=dt, return_zhat=True)
+    plotting.plot_ldn_repr_error(
+        error, theta, theta_p, z, dt, zhats, prediction_dim_labs,
+        max_rows=3,
+        folder='data/presentation_figures/',
+        save_name='LDN_prediction_Z')
 
 elif to_show in ['act', 'activites', 'neurons', 'spikes']:
     z = act[:n_steps, :3]
-    output_labs = ['neuron0', 'neuron1', 'neuron2']
+    prediction_dim_labs = ['neuron0', 'neuron1', 'neuron2']
     label = 'Neural Activities'
-    qvals = [150]
+    qvals = [6]
+
+    error, zhats = calc_ldn_repr_err(
+        z, qvals, theta, theta_p, dt=dt, return_zhat=True)
+
+    plotting.plot_ldn_repr_error(
+        error=error,
+        theta=theta,
+        theta_p=theta_p,
+        z=z,
+        dt=dt,
+        zhats=zhats,
+        prediction_dim_labs=prediction_dim_labs,
+        max_rows=3,
+        folder='data/presentation_figures/',
+        save_name='LDN_prediction_activities'
+    )
 
 elif to_show in ['state', 'context', 'c']:
     z = state[:n_steps, :3]
-    output_labs = ['x', 'y', 'z']
+    prediction_dim_labs = ['x', 'y', 'z']
     label = 'Input Context and GT'
     qvals = [4]
+    error, zhats = calc_ldn_repr_err(
+        z, qvals, theta, theta_p, dt=dt, return_zhat=True)
 
-error, zhats = calc_ldn_repr_err(z, qvals, theta, theta_p, dt=dt, return_zhat=True)
-plotting.plot_ldn_repr_error(error, theta, theta_p, z, dt, zhats, output_labs, label)
+    # print(zhats['4'].shape)
+    plotting.plot_ldn_repr_error(
+        error, theta, theta_p, z, dt, zhats, prediction_dim_labs)#, label)
+
+

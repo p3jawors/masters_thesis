@@ -1,6 +1,7 @@
 import nni
 import json
 from masters_thesis import eval_params
+from masters_thesis.utils.eval_utils import calc_nni_err
 
 # Get template params that won't change
 fname = '../parameter_sets/nni_baseline_params.json'
@@ -17,11 +18,15 @@ json_params["llp"]["n_neurons"] = nni_params["n_neurons"]
 json_params["llp"]["learning_rate"] = nni_params["learning_rate"]
 
 print(f'--Starting nni trial: {experiment_id} | {cid}--')
-error = eval_params.run(
+errors, _ = eval_params.run(
     json_params=json_params,
     param_id=cid,
-    load_results=False
+    load_results=False,
+    save=False,
+    plot=False
 )
-nni.report_final_result(error)
-print('final error: ', error)
+
+nni_error = calc_nni_err(errors)
+nni.report_final_result(nni_error)
+print('final error: ', nni_error)
 

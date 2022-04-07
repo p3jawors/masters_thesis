@@ -111,3 +111,6 @@ ENV/
 MUJOCO_LOG*
 *.stl
 *.STL
+
+# nni scripts
+nni_scripts/

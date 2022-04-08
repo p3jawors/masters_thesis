@@ -5,7 +5,7 @@ import nengo
 import sys
 
 from abr_analyze import DataHandler
-from masters_thesis.utils.eval_utils import decode_ldn_data, calc_shifted_error
+from masters_thesis.utils.eval_utils import decode_ldn_data, calc_shifted_error, load_data_from_json
 from masters_thesis.utils.plotting import plot_pred, plot_error
 import predict_llp
 
@@ -16,65 +16,14 @@ if not os.path.exists(folder):
     os.makedirs(folder)
 
 def run(json_params, param_id, load_results=False, save=False, plot=True):
-    # split into separate dicts for easier use
+    json_params, c_state, z_state, times = load_data_from_json(json_params)
+
+    # split into separate dicts for easier referencing
     data_params = json_params['data']
     llp_params = json_params['llp']
     params = json_params['general']
 
-    # get the neuron model object to match the string in the param file
-    model_str = llp_params['neuron_model']
-    if llp_params['neuron_model'] == 'nengo.LIFRate':
-        llp_params['neuron_model'] = nengo.LIFRate
-    elif llp_params['neuron_model'] == 'nengo.LifRectifiedLinear':
-        llp_params['neuron_model'] = nengo.LIFRectifiedLinear
-    elif llp_params['neuron_model'] == 'nengo.RectifiedLinear':
-        llp_params['neuron_model'] = nengo.RectifiedLinear
-    else:
-        raise ValueError(f"{llp_params['neuron_model']} is not a valid neuron model")
-
-    # Load training data
-    if data_params['database_dir'] == '':
-        data_params['database_dir'] = None
-
     dat = DataHandler(data_params['db_name'], data_params['database_dir'])
-    data = dat.load(
-        save_location=data_params['dataset'],
-        parameters=[data_params['state_key'], data_params['ctrl_key'], 'time']
-    )
-
-    # extract our keys from the desired time range
-    full_state = data[data_params['state_key']][
-        data_params['dataset_range'][0]:data_params['dataset_range'][1]
-    ]
-    full_ctrl = data[data_params['ctrl_key']][
-        data_params['dataset_range'][0]:data_params['dataset_range'][1]
-    ]
-    if full_ctrl.ndim == 1:
-        full_ctrl = full_ctrl[:, np.newaxis]
-
-    times = data['time'][data_params['dataset_range'][0]:data_params['dataset_range'][1]]
-
-    # extract our desired dimensions to use as context, it is assumed all ctrl dims are used
-    sub_state = np.take(full_state, indices=data_params['c_dims'], axis=1)
-    sub_ctrl = np.take(full_ctrl, indices=data_params['u_dims'], axis=1)
-    print(sub_state.shape)
-    print(sub_ctrl.shape)
-    c_state = np.hstack((sub_state, sub_ctrl))
-    z_state = np.take(full_state, indices=data_params['z_dims'], axis=1)
-
-    # clear some memory
-    full_state = None
-    del full_state
-    sub_state = None
-    del sub_state
-    full_ctrl = None
-    del full_ctrl
-
-    # add a few missing llp params that we can calculate
-    # llp_params['size_c'] = len(data_params['c_dims']) + ctrl.shape[1]
-    llp_params['size_c'] = len(data_params['c_dims']) + len(data_params['u_dims'])
-    llp_params['size_z'] = len(data_params['z_dims'])
-
 
     if load_results:
         print('Loading previous results')

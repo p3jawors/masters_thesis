@@ -348,6 +348,23 @@ def load_data_from_json(json_params):
     sub_ctrl = np.take(full_ctrl, indices=data_params['u_dims'], axis=1)
     print(sub_state.shape)
     print(sub_ctrl.shape)
+
+    # create ldn history of context that is set with a theta>0
+    if len(data_params['u_dims']) > 0 and data_params['theta_u'] > 0:
+        sub_ctrl = time_series_to_ldn_polynomials(
+            theta=data_params['theta_u'],
+            q=data_params['q_u'],
+            z=sub_ctrl,
+            dt=params['dt']
+        )
+    if len(data_params['c_dims']) > 0 and data_params['theta_c'] > 0:
+        sub_state = time_series_to_ldn_polynomials(
+            theta=data_params['theta_c'],
+            q=data_params['q_c'],
+            z=sub_state,
+            dt=params['dt']
+        )
+
     c_state = np.hstack((sub_state, sub_ctrl))
     z_state = np.take(full_state, indices=data_params['z_dims'], axis=1)
 

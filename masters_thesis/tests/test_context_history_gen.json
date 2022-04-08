@@ -1,0 +1,33 @@
+{
+   "data": {
+        "db_name": "llp_pd",
+        "database_dir": "",
+        "dataset": "1000_linear_targets_faster",
+        "state_key": "mean_shifted_normalized_ego_error",
+        "ctrl_key": "clean_u",
+        "dataset_range": [0, 100],
+        "c_dims": [0, 3],
+        "q_c": 2,
+        "theta_c": 0,
+        "z_dims": [3],
+        "u_dims": [0, 1],
+        "q_u": 2,
+        "theta_u": 0
+    },
+   "llp": {
+        "model_type": "mine",
+        "n_neurons": 3000,
+        "theta": 0.1,
+        "q": 6,
+        "q_a": 6,
+        "q_p": 6,
+        "learning_rate": 1e-5,
+        "neuron_model": "nengo.RectifiedLinear"
+    },
+    "general": {
+        "run_nni": false,
+        "dt": 0.01,
+        "seed": 47,
+        "theta_p": [0.01, 0.05, 0.1]
+    }
+}

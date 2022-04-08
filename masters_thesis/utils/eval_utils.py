@@ -35,23 +35,15 @@ def calc_ldn_repr_err(z, qvals, theta, theta_p, dt=0.01, return_zhat=False):
 
     for q in qvals:
         print(f"encoding ldn with {q=}")
-        model = nengo.Network()
-        with model:
-            ldn = nengo.Node(LDN(theta=theta, q=q, size_in=z.shape[1]), label='ldn')
-
-            def in_func(t):
-                return z[int(t/dt - dt)]
-
-            in_node = nengo.Node(in_func, size_in=None, size_out=z.shape[1])
-
-            nengo.Connection(in_node, ldn, synapse=None)
-            Z = nengo.Probe(ldn, synapse=None)
-        sim = nengo.Simulator(network=model, dt=dt)
-        with sim:
-            sim.run(z.shape[0]*dt)
+        Z = time_series_to_ldn_polynomials(
+            theta=theta,
+            q=q,
+            z=z,
+            dt=dt
+        )
 
         zhat = decode_ldn_data(
-            Z=sim.data[Z],
+            Z=Z,
             q=q,
             theta=theta,
             theta_p=theta_p
@@ -77,6 +69,25 @@ def calc_ldn_repr_err(z, qvals, theta, theta_p, dt=0.01, return_zhat=False):
         return results, zhats
     else:
         return results
+
+def time_series_to_ldn_polynomials(theta, q, z, dt):
+    model = nengo.Network()
+    with model:
+        ldn = nengo.Node(LDN(theta=theta, q=q, size_in=z.shape[1]), label='ldn')
+
+        def in_func(t):
+            return z[int(t/dt - dt)]
+
+        in_node = nengo.Node(in_func, size_in=None, size_out=z.shape[1])
+
+        nengo.Connection(in_node, ldn, synapse=None)
+        Z = nengo.Probe(ldn, synapse=None)
+    sim = nengo.Simulator(network=model, dt=dt)
+    with sim:
+        sim.run(z.shape[0]*dt)
+
+    return sim.data[Z]
+
 
 
 def decode_ldn_data(Z, q, theta, theta_p=None):

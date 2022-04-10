@@ -314,10 +314,14 @@ def load_data_from_json(json_params):
     model_str = llp_params['neuron_model']
     if llp_params['neuron_model'] == 'nengo.LIFRate':
         llp_params['neuron_model'] = nengo.LIFRate
-    elif llp_params['neuron_model'] == 'nengo.LifRectifiedLinear':
-        llp_params['neuron_model'] = nengo.LIFRectifiedLinear
+    # elif llp_params['neuron_model'] == 'nengo.LifRectifiedLinear':
+    #     llp_params['neuron_model'] = nengo.LIFRectifiedLinear
     elif llp_params['neuron_model'] == 'nengo.RectifiedLinear':
         llp_params['neuron_model'] = nengo.RectifiedLinear
+    elif llp_params['neuron_model'] == nengo.LIFRate or (
+            # llp_params['neuron_model'] == nengo.LifRectifiedLinear or (
+                llp_params['neuron_model'] == nengo.RectifiedLinear):
+        pass
     else:
         raise ValueError(f"{llp_params['neuron_model']} is not a valid neuron model")
 
@@ -343,7 +347,7 @@ def load_data_from_json(json_params):
 
     times = data['time'][data_params['dataset_range'][0]:data_params['dataset_range'][1]]
 
-    # extract our desired dimensions to use as context, it is assumed all ctrl dims are used
+    # extract our desired dimensions to use as context
     sub_state = np.take(full_state, indices=data_params['c_dims'], axis=1)
     sub_ctrl = np.take(full_ctrl, indices=data_params['u_dims'], axis=1)
     print(sub_state.shape)

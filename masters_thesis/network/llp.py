@@ -105,6 +105,7 @@ class LLP(nengo.Network):
             print('No decoders passed in, starting from zeros')
             self.decoders = np.zeros((n_neurons, q, size_z))
         else:
+            print('Using pretrained decoders')
             self.decoders = decoders
 
         with model:

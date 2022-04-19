@@ -59,3 +59,24 @@ vNFqMXPZ
   "q": {"_type": "choice", "_value": [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]},
   "learning_rate": {"_type": "uniform", "_value": [0.000001, 0.001]}
 }
+
+-------------------------------------------------
+4m85bu9x
+- 100k steps from 1000 target reach
+- NEF decode testing for baseline while varying:
+{
+  "n_neurons": {"_type": "randint", "_value": [1000, 20000]},
+  "q_c": {"_type": "randint", "_value": [1, 4]},
+  "theta_c": {"_type": "uniform", "_value": [0.1, 5]},
+  "q_u": {"_type": "randint", "_value": [1, 4]},
+  "theta_u": {"_type": "uniform", "_value": [0.1, 5]}
+}
+- rest from nni_nef_decode_params
+
+best parameters:
+n_neurons:19689
+q_c:2
+theta_c:0.10743513923507855
+q_u:1
+theta_u:3.5942905973291106
+-------------------------------------------------

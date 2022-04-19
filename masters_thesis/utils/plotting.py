@@ -41,7 +41,7 @@ def plot_pred(
 
         plt.gca().set_prop_cycle(None)
         for pp, pred in enumerate(theta_p):
-            axs[ii].plot(time, np.squeeze(zhat[:, pp, ii]), linestyle='--', label=f"{labels[ii]}(t, {pred})")
+            axs[ii].plot(time, np.squeeze(zhat[:, pp, ii]), linestyle='--', label=f"{labels[ii]}hat(t, {pred})")
             # axs[ii].plot(time, z.T[ii], linestyle='--')
             axs[ii].set_ylim(2*np.amin(z.T[ii]), 2*np.amax(z.T[ii]))
 

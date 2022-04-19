@@ -4,6 +4,7 @@ from learn_dyn_sys.network import LearnDynSys
 from abr_analyze import DataHandler
 from llp import LLP
 
+n_neurons = 1000
 freq = 5
 learning_rate = 5e-5
 t_delays = np.linspace(0, 0.1, 5)
@@ -11,7 +12,7 @@ q = 6
 
 dat = DataHandler('codebase_test_set', 'data/databases')
 data = dat.load(save_location='sin5t', parameters=['time', 'state', 'control'])
-dt = 0.001
+dt = 0.01
 model = nengo.Network()
 with model:
     model.config[nengo.Connection].synapse = None
@@ -24,14 +25,19 @@ with model:
     z = nengo.Node(None, size_in=1)
     nengo.Connection(c[0], z)
 
-
-    learn = LearnDynSys(n_neurons=1000, size_c=2, size_z=1,
-                                      q=q, theta=np.max(t_delays),
-                                      learning_rate=5e-5)
+    #===LearnDynSys
+    learn = LearnDynSys(
+        n_neurons=n_neurons,
+        size_c=2,
+        size_z=1,
+        q=q,
+        theta=np.max(t_delays),
+        learning_rate=learning_rate
+    )
     nengo.Connection(z, learn.z, synapse=None)
     nengo.Connection(c, learn.c, synapse=None)
 
-    display = nengo.Node(None, size_in=1+len(t_delays))
+    display = nengo.Node(None, size_in=1+len(t_delays), label='theirs')
     nengo.Connection(z, display[0])
     nengo.Connection(learn.Z, display[1:],
                      transform=learn.get_weights_for_delays(t_delays/learn.theta))
@@ -39,9 +45,9 @@ with model:
 
     #===Pawels implementation
     llp = LLP(
-            n_neurons=1000,
-            size_in=2,
-            size_out=1,
+            n_neurons=n_neurons,
+            size_c=2,
+            size_z=1,
             q_a=q,
             q_p=q,
             q=q,
@@ -51,17 +57,16 @@ with model:
             verbose=True,
     )
 
-    f = 5
-
-    nengo.Connection(c, llp.c, synapse=None)
     nengo.Connection(z, llp.z, synapse=None)
+    nengo.Connection(c, llp.c, synapse=None)
 
-    display_2 = nengo.Node(None, size_in=1+len(t_delays))
+    display_2 = nengo.Node(None, size_in=1+len(t_delays), label='mine')
     nengo.Connection(z, display_2[0])
     nengo.Connection(llp.Z, display_2[1:],
                      transform=learn.get_weights_for_delays(t_delays/learn.theta))
 
 
+    # Difference between implementations
     diff = nengo.Node(size_in=1+len(t_delays))
     nengo.Connection(display, diff, synapse=None)
     nengo.Connection(display_2, diff, synapse=None, transform=-1)

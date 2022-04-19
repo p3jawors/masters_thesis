@@ -88,5 +88,5 @@ if __name__ == '__main__':
     load_results = False
     if len(sys.argv) > 2:
         load_results = bool(sys.argv[2])
-    run(json_params, param_id, load_results, save=True)
+    run(json_params, param_id, load_results, save=False)
 

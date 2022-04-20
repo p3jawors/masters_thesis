@@ -39,6 +39,7 @@ def run(json_params, param_id, load_results=False, save=False, plot=True):
             z_state=z_state,
             # control=ctrl,
             dt=params['dt'],
+            ens_args=json_params['ens_args'],
             **llp_params
         )
 

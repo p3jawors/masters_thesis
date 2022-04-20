@@ -45,17 +45,17 @@ class LLP(nengo.Network):
         the m state at times theta_p from the q legendre coefficients
     neuron_model: nengo neuron model, Optional (Default: nengo.LIFRate)
         nengo neuron model to use for prediction
-    **ens_params: dict
+    **ens_args: dict
         extra ensemble parameters
     """
 
     def __init__(
             self, n_neurons, size_c, size_z, q_a, q_p, q, theta,
             learning=True, decoders=None, learning_rate=0.0, verbose=False, theta_p=None,
-            neuron_model=nengo.LIFRate, ens_params=None, **kwargs):
+            neuron_model=nengo.LIFRate, ens_args=None, **kwargs):
 
-        if ens_params is None:
-            ens_params = {'radius': 1}
+        if ens_args is None:
+            ens_args = {'radius': 1}
 
         self.theta = theta
         # if learning_rate != 0.0:
@@ -119,7 +119,7 @@ class LLP(nengo.Network):
                     dimensions=size_c,
                     neuron_type=neuron_model(),
                     label='neurons',
-                    **ens_params)
+                    **ens_args)
             nengo.Connection(self.c, self.ens, synapse=None)
 
             ldn_a = nengo.Node(

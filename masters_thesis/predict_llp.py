@@ -11,19 +11,20 @@ import nengo
 from network import LLP
 from learn_dyn_sys.network import LearnDynSys
 
-def run_model(c_state, z_state, dt, record_activities=False, **llp_args):
-
-    # dt, n_neurons, size_in, q, q_a, q_p, theta, learning_rate, radius,
-    # seed, state_data, control_data, record_activities=False):
+def run_model(c_state, z_state, dt, record_activities=False, ens_args=None, **llp_args):
     """
 
     """
+    # HACK FOR WEIGHTS
+    # with np.load('weights.npz') as data:
+    #     llp_args['decoders'] = np.reshape(
+    #         data['weights'].T,
+    #         (llp_args['n_neurons'], llp_args['q'], z_state.shape[1])
+    #     )
     if c_state.ndim == 1:
         c_state = c_state[:, np.newaxis]
     if z_state.ndim == 1:
         z_state = z_state[:, np.newaxis]
-    # if control.ndim == 1:
-    #     control = control[:, np.newaxis]
 
     model = nengo.Network()
     with model:
@@ -31,11 +32,14 @@ def run_model(c_state, z_state, dt, record_activities=False, **llp_args):
 
         if llp_args['model_type'] == 'mine':
             # scaling factor to better align with other model
+            # also used to account for different timesteps as
+            # this the LLP is implemented in a nengo node so it
+            # has to be accounted for manually
             llp_args['learning_rate'] *= dt
             del llp_args['model_type']
             llp = LLP(
-                ens_params={'radius': np.sqrt(c_state.shape[1])},
-                **llp_args
+                ens_args=ens_args,
+                **llp_args,
             )
         elif llp_args['model_type'] == 'other':
             llp = LearnDynSys(
@@ -46,19 +50,15 @@ def run_model(c_state, z_state, dt, record_activities=False, **llp_args):
                 n_neurons=llp_args['n_neurons'],
                 learning_rate=llp_args['learning_rate'],
                 neuron_type=llp_args['neuron_model'](),
-                **{'radius': np.sqrt(c_state.shape[1])},
+                **ens_args,
             )
 
         def input_func(t):
             index = int((t-dt)/dt)
-            # state = c_state[index]
-            # u = control[index]
-            # c = np.hstack((state, u)).tolist()
             c = c_state[index]
             return c
 
         input_node = nengo.Node(
-            # input_func, size_out=c_state.shape[1]+control.shape[1], label='c node')
             input_func, size_out=c_state.shape[1], label='c node')
 
         nengo.Connection(input_node, llp.c, synapse=None)
@@ -85,17 +85,5 @@ def run_model(c_state, z_state, dt, record_activities=False, **llp_args):
     if record_activities:
         results['activities'] = sim.data[activity_probe]
     results['Z'] = sim.data[Z_probe]
-    # save_data['n_neurons'] = n_neurons
-    # save_data['size_in'] = size_in
-    # save_data['q_a'] = q_a
-    # save_data['q_p'] = q_p
-    # save_data['q'] = q
-    # save_data['theta'] = theta
-    # save_data['learning_rate'] = learning_rate
-    # save_data['seed'] = seed
-    # save_data['c_dims'] = c_dims
-    # save_data['z_dims'] = z_dims
-    # save_data['dt'] = dt
-    # save_data['radius'] = radius
 
     return results

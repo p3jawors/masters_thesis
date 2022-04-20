@@ -43,21 +43,13 @@ def run(json_params, param_id, plot=False, weights=None):
     # stop theta_steps from the end since we won't have GT for those steps
     c_state = c_state[:-theta_steps]
 
-    # DEBUG PRINT
-    # print('GT_Z: ', GT_Z.shape)
-    # print('context: ', c_state.shape)
-    # print('theta steps: ', theta_steps)
-    # print(f"{llp_params['q']=}")
-    # print(f"{llp_params['theta']=}")
-    # print(f"{params['dt']=}")
-
     model = nengo.Network()
     with model:
         ens = nengo.Ensemble(
             n_neurons=llp_params['n_neurons'],
             dimensions=c_state.shape[1],
             neuron_type=llp_params['neuron_model'](),
-            radius=np.sqrt(c_state.shape[1]),
+            radius=1,#np.sqrt(c_state.shape[1]),
             seed=0
         )
         pred = nengo.Node(size_in=GT_Z.shape[1])
@@ -95,24 +87,16 @@ def run(json_params, param_id, plot=False, weights=None):
                 sim
             )
         else:
+            # NOTE eval function does not work on neur>post connection
             # eval_pt, tgt, decoded = nengo.utils.connection.eval_point_decoding(
             #     conn,
             #     sim,
             #     eval_points=c_state
             # )
-            print('c state shape: ', c_state.shape)
-            print('dt: ', params['dt'])
-            print('steps: ', params['dt']*c_state.shape[0])
             sim.run(c_state.shape[0]*params['dt'])
-            print(sim.trange())
             tgt = GT_Z
             eval_pt = c_state
             decoded = sim.data[net_out]
-
-        print('tgt: ', tgt.shape)
-        print('eval_pts: ', eval_pt.shape)
-        print('decoded: ', decoded.shape)
-
 
         weights = sim.signals[sim.model.sig[conn]["weights"]]
 
@@ -191,21 +175,33 @@ if __name__ == '__main__':
     with open(sys.argv[1]) as fp:
         json_params = json.load(fp)
     param_id = sys.argv[1].split('/')[-1].split('.')[0]
+
+    # NOTE manual varying of paramaters
     # json_params['llp']['n_neurons'] = 1000
     # json_params['data']['q_c'] = 0
     # json_params['data']['theta_c'] = 0.0
     # json_params['data']['q_u'] = 1
     # json_params['data']['theta_u'] = 3.59
 
-    rmse, eval_pts, target_pts, decoded_pts, weights = run(
-        json_params, param_id, plot=True
-    )
-    # for ii in range(0, target_pts.shape[1]):
-    #     plot_x_vs_xhat(tgt[:, ii][:, np.newaxis], decoded[:, ii][:, np.newaxis])
-
-    plot_prediction_vs_gt(target_pts, decoded_pts, json_params)
+    # NOTE first pass that saves weights to npz
+    # rmse, eval_pts, target_pts, decoded_pts, weights = run(
+    #     json_params, param_id, plot=True
+    # )
+    # # for ii in range(0, target_pts.shape[1]):
+    # #     plot_x_vs_xhat(tgt[:, ii][:, np.newaxis], decoded[:, ii][:, np.newaxis])
+    #
+    # plot_prediction_vs_gt(target_pts, decoded_pts, json_params)
     # np.savez_compressed('weights.npz', weights=weights)
 
+    # NOTE second pass loading in weights saved to npz
+    rmse, eval_pts, target_pts, decoded_pts, weights = run(
+        json_params, param_id, plot=True,
+        # weights=weights # np.load('weights.npz')['weights']
+        weights=np.load('weights.npz')['weights']
+    )
+    plot_prediction_vs_gt(target_pts, decoded_pts, json_params)
+
+    # NOTE example of looping through a parameter
     # plt.figure()
     # for neur in [1000, 2000, 3000, 5000]:
     #     json_params['llp']['n_neurons'] = neur
@@ -213,8 +209,4 @@ if __name__ == '__main__':
     #     plt.scatter(neur, rmse)
     # plt.show()
 
-    rmse, eval_pts, target_pts, decoded_pts, weights = run(
-        json_params, param_id, plot=True,
-        weights=weights # np.load('weights.npz')['weights']
-    )
-    plot_prediction_vs_gt(target_pts, decoded_pts, json_params)
+

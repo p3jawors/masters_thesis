@@ -309,6 +309,7 @@ def load_data_from_json(json_params):
     data_params = json_params['data']
     llp_params = json_params['llp']
     params = json_params['general']
+    ens_args = json_params['ens_args']
 
     # get the neuron model object to match the string in the param file
     model_str = llp_params['neuron_model']
@@ -388,5 +389,6 @@ def load_data_from_json(json_params):
     json_params['data'] = data_params
     json_params['llp'] = llp_params
     json_params['general'] = params
+    json_params['ens_args'] = ens_args
 
     return json_params, c_state, z_state, times

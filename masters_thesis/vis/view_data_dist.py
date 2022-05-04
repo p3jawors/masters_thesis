@@ -4,8 +4,8 @@ Plots the data distribution of the raw and cleaned up state and control signals
 from masters_thesis.utils import plotting
 from abr_analyze import DataHandler
 
-dat = DataHandler('llp_pd', 'data/databases')
-save_location='100_linear_targets'
+dat = DataHandler('llp_pd_d', 'data/databases')
+save_location='9999_linear_targets_faster'
 data = dat.load(
     save_location=save_location,
     parameters=dat.get_keys(save_location)
@@ -19,12 +19,12 @@ plotting.plot_data_distribution(
     save_name=f"{folder}world_state-distribution.png"
 
 )
-plotting.plot_data_distribution(
-    data['mean_shift_abs_max_scale_state'],
-    dim_labels=['x', 'y', 'z', 'dx', 'dy', 'dz', 'a', 'b', 'g', 'da', 'db', 'dg'],
-    title='World State: Mean Shifted and Normalized',
-    save_name=f"{folder}world_state-shifted_norm_distribution.png"
-)
+# plotting.plot_data_distribution(
+#     data['mean_shift_abs_max_scale_state'],
+#     dim_labels=['x', 'y', 'z', 'dx', 'dy', 'dz', 'a', 'b', 'g', 'da', 'db', 'dg'],
+#     title='World State: Mean Shifted and Normalized',
+#     save_name=f"{folder}world_state-shifted_norm_distribution.png"
+# )
 
 plotting.plot_data_distribution(
     data['ego_error'],

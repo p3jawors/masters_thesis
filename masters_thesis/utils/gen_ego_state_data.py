@@ -9,7 +9,7 @@ state_and_error, which is a horizontal stack of state and error
 import sys
 import numpy as np
 import matplotlib.pyplot as plt
-from masters_thesis.utils import eval_utils
+# from masters_thesis.utils import eval_utils
 from abr_analyze import DataHandler
 from runtime_utils import ego_state_error
 
@@ -18,17 +18,23 @@ if len(sys.argv) > 1:
     view = sys.argv[1]
 
 
-db_name = 'llp_pd'
-database_dir = None
-train_data = '1000_linear_targets_faster'
+# db_name = 'llp_pd'
+# database_dir = None
+# train_data = '1000_linear_targets_faster'
+
 # database_dir = 'data/databases'
 # train_data = '100_linear_targets' #  90820 temporal data points
+
+db_name = 'llp_pd_d'
+database_dir = 'data/databases'
+train_data = '9999_linear_targets_faster'
 
 dat = DataHandler(db_name, database_dir=database_dir)
 data = dat.load(
     save_location=train_data,
     parameters=['state', 'target', 'time']
 )
+print('N POINTS: ', data['time'].shape)
 # outlier_clipped_state = eval_utils.clipOutliers(data['state'])
 
 state_and_targets = np.hstack((data['state'], data['target']))

@@ -8,6 +8,18 @@ from masters_thesis.network.ldn import LDN
 import matplotlib.pyplot as plt
 from abr_analyze import DataHandler
 
+def RMSE(x, xhat):
+    print('x: ', x.shape)
+    print('xhat: ', xhat.shape)
+    err = 0
+    for ii in range(0, x.shape[0]):
+        for jj in range(0, x.shape[1]):
+            err += (xhat[ii, jj] - x[ii, jj])**2
+    err /= (ii+1)*(jj+1)
+    err = np.sqrt(err)
+    return err
+
+
 def calc_nni_err(errors):
     """
     Input is results from calc_shifted_error()
@@ -35,7 +47,7 @@ def calc_ldn_repr_err(z, qvals, theta, theta_p, dt=0.01, return_zhat=False):
 
     for q in qvals:
         print(f"encoding ldn with {q=}")
-        Z = time_series_to_ldn_polynomials(
+        Z = encode_ldn_data(
             theta=theta,
             q=q,
             z=z,
@@ -70,7 +82,7 @@ def calc_ldn_repr_err(z, qvals, theta, theta_p, dt=0.01, return_zhat=False):
     else:
         return results
 
-def time_series_to_ldn_polynomials(theta, q, z, dt):
+def encode_ldn_data(theta, q, z, dt):
     model = nengo.Network()
     with model:
         ldn = nengo.Node(LDN(theta=theta, q=q, size_in=z.shape[1]), label='ldn')
@@ -353,22 +365,84 @@ def load_data_from_json(json_params):
     sub_ctrl = np.take(full_ctrl, indices=data_params['u_dims'], axis=1)
     print(sub_state.shape)
     print(sub_ctrl.shape)
+    print('\n\n*TODO WILL NEED TO CHECK  DATASET_RANGE IN JSON WHEN LOADING\n\n')
 
     # create ldn history of context that is set with a theta>0
     if len(data_params['u_dims']) > 0 and data_params['theta_u'] > 0:
-        sub_ctrl = time_series_to_ldn_polynomials(
+        # loaded = False
+        # sub_ctrl_key = (
+        #     f"theta_{data_params['theta_u']}-"
+        #     + f"q_{data_params['q_u']}-"
+        #     + f"dt_{params['dt']}-"
+        #     + f"dims_{str(data_params['u_dims'])}"
+        # )
+        #
+        # if 'ldn_ctrl' in dat.get_keys(data_params['dataset']):
+        #     if  sub_ctrl_key in dat.get_keys(f"{data_params['dataset']}/ldn_ctrl"):
+        #         sub_ctrl = dat.load(
+        #             save_location=f"{data_params['dataset']}/ldn_ctrl",
+        #             parameters=[sub_ctrl_key]
+        #         )[sub_ctrl_key]
+        #
+        #         print((
+        #             'Found saved ldn of control signal with specified parameters:'
+        #             + f"{sub_ctrl_key}"
+        #         ))
+        #         loaded = True
+        #
+        # if not loaded:
+        #    print('Did not find saved ldn of control signal, generating now...')
+        sub_ctrl = encode_ldn_data(
             theta=data_params['theta_u'],
             q=data_params['q_u'],
             z=sub_ctrl,
             dt=params['dt']
         )
+    #         dat.save(
+    #             save_location=f"{data_params['dataset']}/ldn_ctrl",
+    #             data={sub_ctrl_key: sub_ctrl}
+    #         )
+    #         print("Saved ldn of control signal to: "
+    #             + f"{data_params['dataset']}/ldn_ctrl/{sub_ctrl_key}"
+    #         )
     if len(data_params['c_dims']) > 0 and data_params['theta_c'] > 0:
-        sub_state = time_series_to_ldn_polynomials(
+    #     loaded = False
+    #     sub_state_key = (
+    #         f"theta_{data_params['theta_c']}-"
+    #         + f"q_{data_params['q_c']}-"
+    #         + f"dt_{params['dt']}-"
+    #         + f"dims_{str(data_params['c_dims'])}"
+    #     )
+    #
+    #     if 'ldn_state' in dat.get_keys(data_params['dataset']):
+    #         if  sub_state_key in dat.get_keys(f"{data_params['dataset']}/ldn_state"):
+    #             sub_state = dat.load(
+    #                 save_location=f"{data_params['dataset']}/ldn_state",
+    #                 parameters=[sub_state_key]
+    #             )[sub_state_key]
+    #
+    #             print((
+    #                 'Found saved ldn of context signal with specified parameters:'
+    #                 + f"{sub_state_key}"
+    #             ))
+    #             loaded = True
+    #
+    #     if not loaded:
+    #         print('Did not find saved ldn of control signal, generating now...')
+        sub_state = encode_ldn_data(
             theta=data_params['theta_c'],
             q=data_params['q_c'],
             z=sub_state,
             dt=params['dt']
         )
+            # dat.save(
+            #     save_location=f"{data_params['dataset']}/ldn_state",
+            #     data={sub_state_key: sub_state}
+            # )
+            # print("Saved ldn of context to: "
+            #     + f"{data_params['dataset']}/ldn_state/{sub_state_key}"
+            # )
+
 
     c_state = np.hstack((sub_state, sub_ctrl))
     z_state = np.take(full_state, indices=data_params['z_dims'], axis=1)

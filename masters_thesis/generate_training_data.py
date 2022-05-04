@@ -143,6 +143,7 @@ save_location = f'{n_targets}_linear_targets_faster'
 notes = (
 """
 -max_v=6, acc=3
+-same as before, just generating more data
 """
 )
 
@@ -265,13 +266,13 @@ try:
 
     with nengo.Simulator(model, dt=airsim_dt) as sim:
         # path planner will exit when we reach our final target
-        sim.run(1e6 * airsim_dt)
+        sim.run(1e7 * airsim_dt)
 
 except ExitSim as e:
     print('Exiting Sim')
 
 finally:
-    dat = DataHandler('llp_pd', 'data/databases')
+    dat = DataHandler('llp_pd_d', 'data/databases')
     data = {}
     for key, val in probes.items():
         data[key] = sim.data[val]

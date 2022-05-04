@@ -1,11 +1,11 @@
 {
    "data": {
-        "db_name": "llp_pd",
-        "database_dir": "",
-        "dataset": "1000_linear_targets_faster",
+        "db_name": "llp_pd_d",
+        "database_dir": "data/databases",
+        "dataset": "9999_linear_targets_faster",
         "state_key": "mean_shifted_normalized_ego_error",
         "ctrl_key": "clean_u",
-        "dataset_range": [0, -1],
+        "dataset_range": [0, 250000],
         "c_dims": [0, 1, 2],
         "q_c": 0,
         "theta_c": 0,
@@ -19,9 +19,9 @@
         "n_neurons": 1000,
         "theta": 1,
         "q": 2,
-        "q_a": 2,
+        "q_a": 5,
         "q_p": 1,
-        "learning_rate": 1.6683925659556075e-7,
+        "learning_rate": 8.656205265024589e-7,
         "neuron_model": "nengo.LIFRate"
     },
     "ens_args": {

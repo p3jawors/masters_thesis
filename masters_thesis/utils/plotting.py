@@ -6,9 +6,82 @@ from matplotlib import cm
 import imageio
 import os
 import numpy as np
+from masters_thesis.utils.eval_utils import decode_ldn_data
+
+def plot_x_vs_xhat(x, xhat):
+    """
+    Weird plot comparing (x, x), against (x, xhat).
+    The idea is the x axis is the target value to be
+    represented, and the y axis is the representation
+    of it. The perfect result would be a straight line
+    with a slope of 1.
+    """
+    plt.figure(figsize=(6, 8))
+    plt.subplot(211)
+    plt.title('Network Value Decoding')
+    plt.xlabel('Value to Represent')
+    plt.ylabel('Decoded Attempt')
+    plt.plot(x, x, label='ideal')
+    plt.plot(x, xhat, linestyle='--', label='decoded')
+    plt.legend()
+
+    rmse = RMSE(x=x, xhat=xhat)
+
+    plt.subplot(212)
+    plt.title('Error Representing Values')
+    plt.xlabel('Value to Represent')
+    plt.ylabel(r'$Error (x-\^x)$')
+    plt.plot(x, x-xhat, label=f"RMSE: {rmse}")
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+
+def plot_prediction_vs_gt(tgt, decoded, q, theta, theta_p, z_state=None):
+    """
+    Plots predictions of legendre coefficients against GT,
+    and their decoded values given theta and theta_p
+    """
+    plt.figure()
+    for ii in range(0, tgt.shape[1]):
+        plt.subplot(tgt.shape[1], 1, ii+1)
+        plt.plot(tgt[:, ii])
+        # plt.gca().set_prop_cycle(None)
+        plt.plot(decoded[:, ii], linestyle='--')
+
+    plt.figure()
+    zhat_GT = decode_ldn_data(
+        Z=tgt,
+        q=q,
+        theta=theta,
+        theta_p=theta_p
+    )
+    zhat_pred = decode_ldn_data(
+        Z=decoded,
+        q=q,
+        theta=theta,
+        theta_p=theta_p
+    )
+    print(zhat_pred.shape)
+
+    for ii in range(0, zhat_GT.shape[2]):
+        for jj in range(0, zhat_GT.shape[1]):
+            plt.subplot(zhat_GT.shape[2], zhat_GT.shape[1], ii*(zhat_GT.shape[1]) + jj+1)
+            if ii == 0:
+                plt.title(f"theta={theta} | theta_p={theta_p[jj]}")
+            if jj == 0:
+                plt.ylabel(f"dim_{ii}")
+            plt.plot(zhat_GT[:, jj, ii], label='gt z decoded')
+            # plt.gca().set_prop_cycle(None)
+            plt.plot(zhat_pred[:, jj, ii], linestyle='--', label='predicted z decoded')
+            if z_state is not None:
+                plt.plot(z_state[100:, ii], linestyle='-', label='recorded z')
+            plt.legend()
+
+    plt.show()
+
 
 def plot_pred(
-        time, z, zhat, theta_p, size_out, gif_name='gif', animate=True, window=None,
+        time, z, zhat, theta_p, size_out, gif_name='gif', animate=False, window=None,
         step=None, save=False, folder='Figures'):
 
     if not os.path.exists(folder):
@@ -89,7 +162,7 @@ def plot_error(theta_p, errors, dt, prediction_dim_labs=('X', 'Y', 'Z'), theta=N
     Parameters
     ----------
     theta: float Optional (Default: max(theta_p))
-        size of window we are predicted
+        size of window we are predicting
     theta_p: float array
         the times into the future zhat predictions are in [sec]
     errors: float array

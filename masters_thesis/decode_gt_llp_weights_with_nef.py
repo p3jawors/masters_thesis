@@ -3,14 +3,10 @@ import sys
 import numpy as np
 from abr_analyze import DataHandler
 import json
-from masters_thesis.utils.eval_utils import time_series_to_ldn_polynomials, load_data_from_json, decode_ldn_data
-import matplotlib.pyplot as plt
+from masters_thesis.utils.eval_utils import encode_ldn_data, load_data_from_json, RMSE
+from masters_thesis.utils.plotting import plot_x_vs_xhat, plot_prediction_vs_gt
 
-# folder = 'data/figures/'
-# if not os.path.exists(folder):
-#     os.makedirs(folder)
-
-def run(json_params, param_id, plot=False, weights=None):
+def run(json_params, weights=None):
     json_params, c_state, z_state, times = load_data_from_json(json_params)
     print('c state: ', c_state.shape)
     print('z state: ', z_state.shape)
@@ -28,7 +24,7 @@ def run(json_params, param_id, plot=False, weights=None):
     # if the LLP outputs q coefficients at time t that represent the signal theta
     # seconds into the future, this would be the same as the ldn representation
     # with the same q and theta, but in t+theta seconds
-    GT_Z = time_series_to_ldn_polynomials(
+    GT_Z = encode_ldn_data(
         theta=llp_params['theta'],
         q=llp_params['q'],
         z=z_state,
@@ -102,79 +98,12 @@ def run(json_params, param_id, plot=False, weights=None):
 
     return(RMSE(tgt, decoded), eval_pt, tgt, decoded, weights)
 
-def RMSE(x, xhat):
-    err = 0
-    for ii in range(0, x.shape[0]):
-        for jj in range(0, x.shape[1]):
-            err += (xhat[ii, jj] - x[ii, jj])**2
-    err /= (ii+1)*(jj+1)
-    err = np.sqrt(err)
-    return err
-
-
-def plot_x_vs_xhat(x, xhat):
-    plt.figure(figsize=(6, 8))
-    plt.subplot(211)
-    plt.title('Network Value Decoding')
-    plt.xlabel('Value to Represent')
-    plt.ylabel('Decoded Attempt')
-    plt.plot(x, x, label='ideal')
-    plt.plot(x, xhat, linestyle='--', label='decoded')
-    plt.legend()
-
-    rmse = RMSE(x=x, xhat=xhat)
-
-    plt.subplot(212)
-    plt.title('Error Representing Values')
-    plt.xlabel('Value to Represent')
-    plt.ylabel(r'$Error (x-\^x)$')
-    plt.plot(x, x-xhat, label=f"RMSE: {rmse}")
-    plt.legend()
-    plt.tight_layout()
-    plt.show()
-
-def plot_prediction_vs_gt(tgt, decoded, json_params):
-    plt.figure()
-    for ii in range(0, tgt.shape[1]):
-        plt.subplot(tgt.shape[1], 1, ii+1)
-        plt.plot(tgt[:, ii])
-        # plt.gca().set_prop_cycle(None)
-        plt.plot(decoded[:, ii], linestyle='--')
-
-    plt.figure()
-    zhat_GT = decode_ldn_data(
-        Z=tgt,
-        q=json_params['llp']['q'],
-        theta=json_params['llp']['theta'],
-        theta_p=json_params['general']['theta_p']
-    )
-    zhat_pred = decode_ldn_data(
-        Z=decoded,
-        q=json_params['llp']['q'],
-        theta=json_params['llp']['theta'],
-        theta_p=json_params['general']['theta_p']
-    )
-    print(zhat_pred.shape)
-
-    for ii in range(0, zhat_GT.shape[2]):
-        for jj in range(0, zhat_GT.shape[1]):
-            plt.subplot(zhat_GT.shape[2], zhat_GT.shape[1], ii*(zhat_GT.shape[1]) + jj+1)
-            if ii == 0:
-                plt.title(f"theta={json_params['llp']['theta']} | theta_p={json_params['general']['theta_p'][jj]}")
-            if jj == 0:
-                plt.ylabel(f"dim_{ii}")
-            plt.plot(zhat_GT[:, jj, ii])
-            # plt.gca().set_prop_cycle(None)
-            plt.plot(zhat_pred[:, jj, ii], linestyle='--')
-
-    plt.show()
 
 if __name__ == '__main__':
     # load in all parameters
     # with open('parameter_sets/nni_nef_decode_params.json') as fp:
     with open(sys.argv[1]) as fp:
         json_params = json.load(fp)
-    param_id = sys.argv[1].split('/')[-1].split('.')[0]
 
     # NOTE manual varying of paramaters
     # json_params['llp']['n_neurons'] = 1000
@@ -195,11 +124,17 @@ if __name__ == '__main__':
 
     # NOTE second pass loading in weights saved to npz
     rmse, eval_pts, target_pts, decoded_pts, weights = run(
-        json_params, param_id, plot=True,
+        json_params,
         # weights=weights # np.load('weights.npz')['weights']
         weights=np.load('weights.npz')['weights']
     )
-    plot_prediction_vs_gt(target_pts, decoded_pts, json_params)
+    plot_prediction_vs_gt(
+        target_pts,
+        decoded_pts,
+        json_params['llp']['q'],
+        json_params['llp']['theta'],
+        json_params['general']['theta_p']
+        )
 
     # NOTE example of looping through a parameter
     # plt.figure()

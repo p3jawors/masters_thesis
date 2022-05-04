@@ -16,7 +16,8 @@ def run_model(c_state, z_state, dt, record_activities=False, ens_args=None, **ll
 
     """
     # HACK FOR WEIGHTS
-    # with np.load('weights.npz') as data:
+    # print('USING HACKY WEIGHT LOADING')
+    # with np.load('weights_for_test.npz') as data:
     #     llp_args['decoders'] = np.reshape(
     #         data['weights'].T,
     #         (llp_args['n_neurons'], llp_args['q'], z_state.shape[1])

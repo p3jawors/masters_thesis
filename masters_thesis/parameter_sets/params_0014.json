@@ -19,9 +19,9 @@
         "n_neurons": 1000,
         "theta": 1,
         "q": 2,
-        "q_a": 2,
+        "q_a": 5,
         "q_p": 1,
-        "learning_rate": 1.6683925659556075e-7,
+        "learning_rate": 8.656205265024589e-7,
         "neuron_model": "nengo.LIFRate"
     },
     "ens_args": {

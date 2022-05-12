@@ -36,10 +36,13 @@ def plot_x_vs_xhat(x, xhat):
     plt.tight_layout()
     plt.show()
 
-def plot_prediction_vs_gt(tgt, decoded, q, theta, theta_p, z_state=None):
+def plot_prediction_vs_gt(tgt, decoded, q, theta, theta_p, z_state=None, xlim=None):
     """
     Plots predictions of legendre coefficients against GT,
     and their decoded values given theta and theta_p
+
+    NOTE: input has to already be shifted in time if comparing ldn/llp predictions
+    ie: this function does NOT do time shifting
     """
     plt.figure()
     for ii in range(0, tgt.shape[1]):
@@ -74,8 +77,10 @@ def plot_prediction_vs_gt(tgt, decoded, q, theta, theta_p, z_state=None):
             # plt.gca().set_prop_cycle(None)
             plt.plot(zhat_pred[:, jj, ii], linestyle='--', label='predicted z decoded')
             if z_state is not None:
-                plt.plot(z_state[100:, ii], linestyle='-', label='recorded z')
+                plt.plot(z_state[:, ii], linestyle='-', label='recorded z')
             plt.legend()
+            if xlim is not None:
+                plt.xlim(xlim[0], xlim[1])
 
     plt.show()
 

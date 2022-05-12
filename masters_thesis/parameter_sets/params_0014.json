@@ -5,7 +5,7 @@
         "dataset": "1000_linear_targets_faster",
         "state_key": "mean_shifted_normalized_ego_error",
         "ctrl_key": "clean_u",
-        "dataset_range": [0, -1],
+        "dataset_range": [0, 100000],
         "c_dims": [0, 1, 2],
         "q_c": 0,
         "theta_c": 0,

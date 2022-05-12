@@ -69,7 +69,7 @@ print('SUM LLP ERROR: ', sum(sum(error_llp)))
 print("testing calc_ldn_repr_error")
 qvals = np.arange(1, 10)
 #NOTE test repr error calc
-results = utils.calc_ldn_repr_err(
+results = utils.calc_ldn_err_vs_q(
     z=train_data[:, np.newaxis],
     qvals=qvals,
     theta=theta_p,
@@ -77,6 +77,9 @@ results = utils.calc_ldn_repr_err(
     dt=dt
 )
 plt.figure()
+plt.title('Abs Err varying q of ldn')
+plt.ylabel('Absolute Error')
+plt.xlabel('Time')
 for key, val in results.items():
     plt.plot(np.squeeze(val), label=key)
 plt.legend()

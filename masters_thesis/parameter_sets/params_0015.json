@@ -5,7 +5,7 @@
         "dataset": "9999_linear_targets_faster",
         "state_key": "mean_shifted_normalized_ego_error",
         "ctrl_key": "clean_u",
-        "dataset_range": [0, 250000],
+        "dataset_range": [0, 100000],
         "c_dims": [0, 1, 2],
         "q_c": 0,
         "theta_c": 0,
@@ -15,14 +15,14 @@
         "theta_u": 3.59
     },
    "llp": {
-        "model_type": "mine",
+        "model_type": "other",
         "n_neurons": 1000,
         "theta": 1,
         "q": 2,
         "q_a": 5,
         "q_p": 1,
         "learning_rate": 8.656205265024589e-7,
-        "neuron_model": "nengo.LIFRate"
+        "neuron_model": "nengo.RectifiedLinear"
     },
     "ens_args": {
         "seed": 0,
@@ -31,7 +31,7 @@
     "general": {
         "run_nni": false,
         "dt": 0.01,
-        "theta_p": [1]
+        "theta_p": [0, 0.01, 0.05, 0.1, 0.2, 1]
     }
 
 }

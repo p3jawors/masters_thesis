@@ -8,6 +8,83 @@ from masters_thesis.network.ldn import LDN
 import matplotlib.pyplot as plt
 from abr_analyze import DataHandler
 
+def encode_ldn_data(theta, q, z, dt):
+    model = nengo.Network()
+    with model:
+        ldn = nengo.Node(LDN(theta=theta, q=q, size_in=z.shape[1]), label='ldn')
+
+        def in_func(t):
+            return z[int(t/dt - dt)]
+
+        in_node = nengo.Node(in_func, size_in=None, size_out=z.shape[1])
+
+        nengo.Connection(in_node, ldn, synapse=None)
+        Z = nengo.Probe(ldn, synapse=None)
+    sim = nengo.Simulator(network=model, dt=dt)
+    with sim:
+        sim.run(z.shape[0]*dt)
+
+    return sim.data[Z]
+
+def flip_odd_ldn_coefficients(Z, q):
+    """
+        if using LDN to encode future state, but want to decode
+        like an LLP where theta_p/theta=1 is the future state, we
+        need to flip the odd coefficients' signs. With respect to
+        the LDN encoding, theta_p/theta=1 is theta seconds in the
+        past, which is time t relative to the LLP prediction.
+
+    Parameters
+    ----------
+    Z: nx(qxd) array
+        encoded data shape n_steps x (qxd) stacked (d0q0...d0qn, d1q0....d1qn,...,dnq0...dnqm)
+    """
+    scales = np.ones(Z.shape[1])
+    for ii, scale in enumerate(scales):
+        if (ii%q)%2 != 0:
+            scales[ii] *= -1
+    print('Z shape: ', Z.shape)
+    print('q: ', q)
+    print('scales: ', scales)
+    return scales*Z
+
+
+def decode_ldn_data(Z, q, theta, theta_p=None):
+    """
+    Parameters
+    ----------
+    Z: float array(steps, m*q)
+        prediction of state Z in legendre domain
+    q: int
+        legendre dimensionality
+    theta: float
+        prediction horizon length [sec]
+    theta_p: float array, Optional (Default: None)
+        The times to extract from the legendre predictions
+        if None, we will output the prediction at theta.
+    """
+    # print(f"{Z.shape=}")
+    # print(f"{q=}")
+    # print(f"{theta=}")
+    # print(f"{theta_p.shape=}")
+    m = int(Z.shape[1]/q)
+    # print(f"{m=}")
+    if theta_p is None:
+        theta_p = [theta]
+    theta_p = np.asarray(theta_p)
+
+    # shape (len(theta_p), q)
+    transform = LDN(theta=theta, q=q, size_in=1).get_weights_for_delays(theta_p/theta)
+    # print(f"{transform.shape=}")
+    zhat = []
+    for _Z in tqdm(Z):
+        _Z = _Z.reshape((m, q)).T
+        zhat.append(np.dot(transform, _Z))
+        # print(f"{_Z.shape=}")
+
+    return np.asarray(zhat)
+
+
 def RMSE(x, xhat):
     print('x: ', x.shape)
     print('xhat: ', xhat.shape)
@@ -17,10 +94,12 @@ def RMSE(x, xhat):
             err += (xhat[ii, jj] - x[ii, jj])**2
     err /= (ii+1)*(jj+1)
     err = np.sqrt(err)
+    print('err shape: ', err.shape)
+    print(err)
     return err
 
 
-def calc_nni_err(errors):
+def calc_abs_err(errors):
     """
     Input is results from calc_shifted_error()
     Output is a single value that can be used for optimization
@@ -30,7 +109,7 @@ def calc_nni_err(errors):
     return error
 
 
-def calc_ldn_repr_err(z, qvals, theta, theta_p, dt=0.01, return_zhat=False):
+def calc_ldn_err_vs_q(z, qvals, theta, theta_p, dt=0.01, return_zhat=False):
     """
     Shows error of representation of decoded LDN at theta_p values, vary
     q used in LDN representation.
@@ -81,61 +160,6 @@ def calc_ldn_repr_err(z, qvals, theta, theta_p, dt=0.01, return_zhat=False):
         return results, zhats
     else:
         return results
-
-def encode_ldn_data(theta, q, z, dt):
-    model = nengo.Network()
-    with model:
-        ldn = nengo.Node(LDN(theta=theta, q=q, size_in=z.shape[1]), label='ldn')
-
-        def in_func(t):
-            return z[int(t/dt - dt)]
-
-        in_node = nengo.Node(in_func, size_in=None, size_out=z.shape[1])
-
-        nengo.Connection(in_node, ldn, synapse=None)
-        Z = nengo.Probe(ldn, synapse=None)
-    sim = nengo.Simulator(network=model, dt=dt)
-    with sim:
-        sim.run(z.shape[0]*dt)
-
-    return sim.data[Z]
-
-
-
-def decode_ldn_data(Z, q, theta, theta_p=None):
-    """
-    Parameters
-    ----------
-    Z: float array(steps, m*q)
-        prediction of state Z in legendre domain
-    q: int
-        legendre dimensionality
-    theta: float
-        prediction horizon length [sec]
-    theta_p: float array, Optional (Default: None)
-        The times to extract from the legendre predictions
-        if None, we will output the prediction at theta.
-    """
-    # print(f"{Z.shape=}")
-    # print(f"{q=}")
-    # print(f"{theta=}")
-    # print(f"{theta_p.shape=}")
-    m = int(Z.shape[1]/q)
-    # print(f"{m=}")
-    if theta_p is None:
-        theta_p = [theta]
-    theta_p = np.asarray(theta_p)
-
-    # shape (len(theta_p), q)
-    transform = LDN(theta=theta, q=q, size_in=1).get_weights_for_delays(theta_p/theta)
-    # print(f"{transform.shape=}")
-    zhat = []
-    for _Z in tqdm(Z):
-        _Z = _Z.reshape((m, q)).T
-        zhat.append(np.dot(transform, _Z))
-        # print(f"{_Z.shape=}")
-
-    return np.asarray(zhat)
 
 
 def calc_shifted_error(z, zhat, dt, theta_p, model='llp'):
@@ -466,3 +490,11 @@ def load_data_from_json(json_params):
     json_params['ens_args'] = ens_args
 
     return json_params, c_state, z_state, times
+
+if __name__ == '__main__':
+    q=5
+    d=3
+    n=10
+    new = flip_odd_ldn_coefficients(Z=np.ones((n, q*d)),q=q)
+    np.set_printoptions(threshold=np.inf)
+    print(new)

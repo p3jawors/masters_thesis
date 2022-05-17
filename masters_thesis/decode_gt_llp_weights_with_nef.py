@@ -4,7 +4,8 @@ import numpy as np
 from abr_analyze import DataHandler
 import json
 from masters_thesis.utils.eval_utils import encode_ldn_data, load_data_from_json, RMSE, flip_odd_ldn_coefficients, decode_ldn_data
-from masters_thesis.utils.plotting import plot_x_vs_xhat, plot_prediction_vs_gt, plot_error
+from masters_thesis.utils.plotting import plot_x_vs_xhat, plot_prediction_vs_gt
+import masters_thesis.utils.plotting as plotting
 
 def run(json_params, weights=None):
     json_params, c_state, z_state, times = load_data_from_json(json_params)
@@ -37,7 +38,6 @@ def run(json_params, weights=None):
     # Shift GT back by theta
     theta_steps = int(llp_params['theta']/params['dt'])
     GT_Z = GT_Z[theta_steps:]
-    # GT_z_decoded = z_state[theta_steps:]
 
     # stop theta_steps from the end since we won't have GT for those steps
     c_state = c_state[:-theta_steps]
@@ -82,17 +82,13 @@ def run(json_params, weights=None):
     sim = nengo.Simulator(model, dt=params['dt'])
     with sim:
         if weights is None:
+            print("Solving for weights directly")
             eval_pt, tgt, decoded = nengo.utils.connection.eval_point_decoding(
                 conn,
                 sim
             )
         else:
-            # NOTE eval function does not work on neur>post connection
-            # eval_pt, tgt, decoded = nengo.utils.connection.eval_point_decoding(
-            #     conn,
-            #     sim,
-            #     eval_points=c_state
-            # )
+            print("Running with pretrained weights")
             sim.run(c_state.shape[0]*params['dt'])
             tgt = GT_Z
             eval_pt = c_state
@@ -103,100 +99,254 @@ def run(json_params, weights=None):
     return(RMSE(tgt, decoded), eval_pt, tgt, decoded, weights, z_state)
 
 
-if __name__ == '__main__':
-    # load in all parameters
-    # with open('parameter_sets/nni_nef_decode_params.json') as fp:
-    with open(sys.argv[1]) as fp:
+def run_variation_comparison(json_fp, key_list, variation_list, labels, show_prediction=False, save=False, load=False):
+
+    # for changing nested values
+    def nested_set(dic, keys, value):
+        for key in keys[:-1]:
+            dic = dic.setdefault(key, {})
+        dic[keys[-1]] = value
+
+    figure = None
+    axs = None
+
+    with open(json_fp) as fp:
         json_params = json.load(fp)
 
-    # NOTE manual varying of paramaters
-    # json_params['llp']['n_neurons'] = 1000
-    # json_params['data']['q_c'] = 0
-    # json_params['data']['theta_c'] = 0.0
-    # json_params['data']['q_u'] = 1
-    # json_params['data']['theta_u'] = 3.59
+    if save or load:
+        dat = DataHandler(
+            db_name=json_params['data']['db_name']+'_results',
+            database_dir=json_params['data']['database_dir']
+        )
 
-    # NOTE first pass that saves weights to npz
-    rmse, eval_pts, target_pts, decoded_pts, weights, z_state = run(json_params)
-    # for ii in range(0, target_pts.shape[1]):
-    #     plot_x_vs_xhat(tgt[:, ii][:, np.newaxis], decoded[:, ii][:, np.newaxis])
+        dat.save(
+            save_location=json_fp.split('/')[-1] + '/params',
+            data=json_params,
+            overwrite=True
+        )
 
-    theta_steps = int(json_params['llp']['theta']/json_params['general']['dt'])
-    # since we reomve theta steps fro teh GT
-    n_steps = np.diff(json_params['data']['dataset_range'])[0] - theta_steps
-    m = len(json_params['data']['z_dims'])
-    print(type(n_steps))
-    print(type(m))
-    print(n_steps)
-    print(m)
-    json_params['general']['theta_p'] = np.arange(
-            json_params['general']['dt'], json_params['llp']['theta'], json_params['general']['dt']*10
-        )
-    RMSEs = np.zeros((n_steps, int(len(json_params['general']['theta_p']))))#, m))
-    for ii, tp in enumerate(json_params['general']['theta_p']):
-        tp_steps = int(tp/json_params['general']['dt'])
-        x = decode_ldn_data(
-            Z=target_pts,
-            q=json_params['llp']['q'],
+    for vv, var in enumerate(variation_list):
+        if save or load:
+            save_name = ''
+            save_name = '/'.join(key_list)
+            save_name = json_fp.split('/')[-1] + '/results/' + save_name + '/' + str(var)
+
+        if not load:
+            nested_set(json_params, key_list, var)
+            print(f"Updated json_params by changing {key_list} to {var}\n{json_params}")
+
+            # NOTE first pass that saves weights to npz
+            print(f"Getting decoded points from training set{json_fp}")
+            json_params['data']['dataset_range'] = json_params['data']['train_range']
+            rmse, eval_pts, target_pts, decoded_pts, weights, z_state = run(json_params)
+
+            print('Getting test results')
+            json_params['data']['dataset_range'] = json_params['data']['test_range']
+            rmse, eval_pts, target_pts, decoded_pts, weights, z_state = run(json_params, weights=weights)
+
+            theta_steps = int(json_params['llp']['theta']/json_params['general']['dt'])
+
+            # account for steps removed from GT
+            n_steps = np.diff(json_params['data']['dataset_range'])[0] - theta_steps
+
+            print('Calculating RMSE for each theta_p')
+            RMSEs = np.zeros((n_steps, int(len(json_params['general']['theta_p']))))#, m))
+            for ii, tp in enumerate(json_params['general']['theta_p']):
+                tp_steps = int(tp/json_params['general']['dt'])
+                x = decode_ldn_data(
+                    Z=target_pts,
+                    q=json_params['llp']['q'],
+                    theta=json_params['llp']['theta'],
+                    theta_p=tp
+                )
+                xhat = decode_ldn_data(
+                    Z=decoded_pts,
+                    q=json_params['llp']['q'],
+                    theta=json_params['llp']['theta'],
+                )
+                err = RMSE(x.T, xhat.T)
+                RMSEs[:, ii] = err#[:, np.newaxis]
+        else:
+            print(f"Loading results from: {save_name}")
+            data = dat.load(
+                parameters=[
+                    'RMSE',
+                    'target_pts',
+                    'decoded_pts',
+                    'z_state',
+                    'decoded_z',
+                    'decoded_zhat'
+                ],
+                save_location=save_name
+            )
+            RMSEs = data['RMSE']
+            target_pts = data['target_pts']
+            decoded_pts = data['decoded_pts']
+            z_state = data['z_state']
+            x = data['decoded_z']
+            xhat = data['decoded_zhat']
+
+
+        if save:
+            print(f"Saving results to: {save_name}")
+            dat.save(
+                save_location=save_name,
+                data={
+                    'RMSE': RMSEs,
+                    'target_pts': target_pts,
+                    'decoded_pts': decoded_pts,
+                    'z_state': z_state,
+                    'decoded_z': x,
+                    'decoded_zhat': xhat
+                },
+                overwrite=True
+            )
+
+        if vv+1 == len(variation_list):
+            save_fig = True
+            print('saving image this time')
+        else:
+            save_fig = False
+        show = save_fig
+        # print('Plotting')
+        figure, axs = plotting.plot_mean_time_error_vs_theta_p(
+            theta_p=json_params['general']['theta_p'],
+            errors=RMSEs[:, :, np.newaxis],
+            dt=json_params['general']['dt'],
             theta=json_params['llp']['theta'],
-            theta_p=tp
+            figure=figure,
+            axs=axs,
+            show=show,
+            legend_label=labels[vv],
+            save=save_fig,
+            folder='data',
+            label='nef_decode_vary_q_other_'
         )
-        xhat = decode_ldn_data(
-            Z=decoded_pts,
-            q=json_params['llp']['q'],
+
+        if show_prediction:
+            plot_prediction_vs_gt(
+                tgt=target_pts,
+                decoded=decoded_pts,
+                q=json_params['llp']['q'],
+                theta=json_params['llp']['theta'],
+                theta_p=json_params['general']['theta_p'],
+                z_state=z_state,#[theta_steps:]
+                xlim=[0, 1000],
+                show=True,
+                save=True,
+                savename=f"data/pred_vs_gt_q_{json_params['llp']['q']}.jpg"
+            )
+
+def run_json_comparison(json_list, labels, show_prediction=False):
+    figure = None
+    axs = None
+    for jj, json_fp in enumerate(json_list):
+        with open(json_fp) as fp:
+            json_params = json.load(fp)
+
+        # NOTE first pass that saves weights to npz
+        print(f"Parameter set: {json_fp}")
+        print("Getting decoded points from training set")
+        json_params['data']['dataset_range'] = [0, 80000]
+        rmse, eval_pts, target_pts, decoded_pts, weights, z_state = run(json_params)
+
+        print('Getting test results')
+        json_params['data']['dataset_range'] = [80000, 100000]
+        rmse, eval_pts, target_pts, decoded_pts, weights, z_state = run(json_params, weights=weights)
+
+        theta_steps = int(json_params['llp']['theta']/json_params['general']['dt'])
+
+        # Account for the steps removed from GT
+        n_steps = np.diff(json_params['data']['dataset_range'])[0] - theta_steps
+
+        # m = len(json_params['data']['z_dims'])
+        # json_params['general']['theta_p'] = np.arange(
+        #         json_params['general']['dt'], json_params['llp']['theta'], json_params['general']['dt']*10
+        #     )
+        #
+        # json_params['general']['theta_p'] = np.linspace(
+        #         json_params['general']['dt'], json_params['llp']['theta'], 10
+        #     )
+
+        print('Calculating RMSE for each theta_p')
+        RMSEs = np.zeros((n_steps, int(len(json_params['general']['theta_p']))))#, m))
+        for ii, tp in enumerate(json_params['general']['theta_p']):
+            tp_steps = int(tp/json_params['general']['dt'])
+            # decode GT coefficients
+            x = decode_ldn_data(
+                Z=target_pts,
+                q=json_params['llp']['q'],
+                theta=json_params['llp']['theta'],
+                theta_p=tp
+            )
+            # decode prediction
+            xhat = decode_ldn_data(
+                Z=decoded_pts,
+                q=json_params['llp']['q'],
+                theta=json_params['llp']['theta'],
+            )
+            err = RMSE(x.T, xhat.T)
+            RMSEs[:, ii] = err
+
+
+        if jj+1 == int(len(json_list)):
+            save = True
+        else:
+            save = False
+        show = save
+
+        # print('Plotting')
+        figure, axs = plotting.plot_mean_time_error_vs_theta_p(
+            theta_p=json_params['general']['theta_p'],
+            errors=RMSEs[:, :, np.newaxis],
+            dt=json_params['general']['dt'],
             theta=json_params['llp']['theta'],
+            figure=figure,
+            axs=axs,
+            show=show,
+            legend_label=labels[jj],
+            save=save,
+            folder='data',
+            label='nef_decode_'
         )
-        err = RMSE(x.T, xhat.T)
-        # print('err shape: ', err[:, np.newaxis].shape)
-        # print('rmses shape: ', RMSEs.shape)
-        # print('rmses slice: ', RMSEs[:-tp_steps, ii].shape)
-        # print('tp steps: ', tp_steps)
-        RMSEs[:, ii] = err#[:, np.newaxis]
-    plot_error(
-        theta_p=json_params['general']['theta_p'],
-        errors=RMSEs[:, :, np.newaxis],
-        dt=json_params['general']['dt'],
-        theta=json_params['llp']['theta']
+
+        if show_prediction:
+            plot_prediction_vs_gt(
+                tgt=target_pts,
+                decoded=decoded_pts,
+                q=json_params['llp']['q'],
+                theta=json_params['llp']['theta'],
+                theta_p=json_params['general']['theta_p'],
+                z_state=z_state,#[theta_steps:]
+                xlim=[0, 1000],
+                show=True,
+                save=True,
+                savename=f"data/pred_vs_gt_q_{json_params['llp']['q']}.jpg"
+            )
+
+if __name__ == '__main__':
+    # labs = [
+    #         'neurons=1000, theta=1', 'neurons=1000, theta=0.1',
+    #         'neurons=10,000, theta=1', 'neurons=10,000, theta=0.1',
+    #         'n_neurons=1000, theta=1, 5x data', 'n_neurons=1000, theta=0.1, 5x data'
+    # ]
+    #
+    # json_list = [
+    #     'parameter_sets/params_0015a.json',
+    #     'parameter_sets/params_0015b.json',
+    #     'parameter_sets/params_0015c.json',
+    #     'parameter_sets/params_0015d.json',
+    #     'parameter_sets/params_0015e.json',
+    #     'parameter_sets/params_0015f.json',
+    # ]
+    # run_json_comparison(json_list, labs)
+
+    run_variation_comparison(
+        json_fp='parameter_sets/params_0016.json',
+        key_list=['llp', 'n_neurons'],
+        variation_list=[100, 200],
+        labels=['100', '200'],
+        show_prediction=False,
+        save=False,
+        load=True
     )
-
-    # plot_prediction_vs_gt(
-    #     tgt=target_pts,
-    #     decoded=decoded_pts,
-    #     q=json_params['llp']['q'],
-    #     theta=json_params['llp']['theta'],
-    #     theta_p=json_params['general']['theta_p'],
-    #     z_state=z_state,#[theta_steps:]
-    #     xlim=[0, 1000]
-    # )
-
-    # np.savez_compressed('weights.npz', weights=weights)
-
-    # # NOTE second pass loading in weights saved to npz
-    # rmse, eval_pts, target_pts, decoded_pts, weights, z_state= run(
-    #     json_params,
-    #     # weights=weights # np.load('weights.npz')['weights']
-    #     weights=np.load('weights.npz')['weights']
-    # )
-    #
-    # theta_steps = int(json_params['llp']['theta']/json_params['general']['dt'])
-    # # GT_z_decoded = z_state[theta_steps:]
-    # plot_prediction_vs_gt(
-    #     tgt=target_pts,
-    #     decoded=decoded_pts,
-    #     q=json_params['llp']['q'],
-    #     theta=json_params['llp']['theta'],
-    #     theta_p=json_params['general']['theta_p'],
-    #     # theta_p=[0],
-    #     z_state=z_state,#[theta_steps:]
-    #     xlim=[0, 1000]
-    #     )
-    #
-    # # NOTE example of looping through a parameter
-    # # plt.figure()
-    # # for neur in [1000, 2000, 3000, 5000]:
-    # #     json_params['llp']['n_neurons'] = neur
-    # #     rmse = run(json_params, param_id)
-    # #     plt.scatter(neur, rmse)
-    # # plt.show()
-    #
-    #

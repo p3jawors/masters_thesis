@@ -36,7 +36,7 @@ def plot_x_vs_xhat(x, xhat):
     plt.tight_layout()
     plt.show()
 
-def plot_prediction_vs_gt(tgt, decoded, q, theta, theta_p, z_state=None, xlim=None):
+def plot_prediction_vs_gt(tgt, decoded, q, theta, theta_p, z_state=None, xlim=None, save=False, savename='pred_vs_gt.jpg', show=True):
     """
     Plots predictions of legendre coefficients against GT,
     and their decoded values given theta and theta_p
@@ -44,14 +44,14 @@ def plot_prediction_vs_gt(tgt, decoded, q, theta, theta_p, z_state=None, xlim=No
     NOTE: input has to already be shifted in time if comparing ldn/llp predictions
     ie: this function does NOT do time shifting
     """
-    plt.figure()
+    plt.figure(figsize=(12,12))
     for ii in range(0, tgt.shape[1]):
         plt.subplot(tgt.shape[1], 1, ii+1)
         plt.plot(tgt[:, ii])
         # plt.gca().set_prop_cycle(None)
         plt.plot(decoded[:, ii], linestyle='--')
 
-    plt.figure()
+    plt.figure(figsize=(20,12))
     zhat_GT = decode_ldn_data(
         Z=tgt,
         q=q,
@@ -82,7 +82,12 @@ def plot_prediction_vs_gt(tgt, decoded, q, theta, theta_p, z_state=None, xlim=No
             if xlim is not None:
                 plt.xlim(xlim[0], xlim[1])
 
-    plt.show()
+    if save:
+        plt.savefig(savename)
+        print(f'Saved pred_vs_gt figure to {savename}')
+
+    if show:
+        plt.show()
 
 
 def plot_pred(
@@ -162,7 +167,7 @@ def plot_pred(
                 os.remove(filename)
     plt.show()
 
-def plot_error(theta_p, errors, dt, prediction_dim_labs=('X', 'Y', 'Z'), theta=None, save=False, label='', folder='Figures'):
+def plot_error_subplot_theta_p(theta, theta_p, errors, dt, prediction_dim_labs=('X', 'Y', 'Z'), save=False, label='', folder='Figures'):
     """
     Parameters
     ----------
@@ -182,84 +187,152 @@ def plot_error(theta_p, errors, dt, prediction_dim_labs=('X', 'Y', 'Z'), theta=N
     if theta is None:
         theta = max(theta_p)
 
-    if 1 <= len(theta_p) < 10:
-        plt.figure(figsize=(8,8))
-        for ii in range(0, len(theta_p)):
-            plt.subplot(len(theta_p), 1, ii+1)
-            plt.title(f"{theta_p[ii]} prediction 2norm error")
-            plt.plot(errors[:, ii, :])
-        if save:
-            plt.savefig(f'{folder}{label}2norm_over_time.jpg')
-        plt.show()
+    plt.figure(figsize=(8,8))
+    for ii in range(0, len(theta_p)):
+        plt.subplot(len(theta_p), 1, ii+1)
+        plt.title(f"{theta_p[ii]} prediction 2norm error")
+        plt.plot(errors[:, ii, :])
+    if save:
+        plt.savefig(f'{folder}{label}2norm_over_time.jpg')
+    plt.show()
 
-    if len(theta_p) > 1:
-        # Plot a 3d plot for each xyz output dim
-        # fig = plt.figure()
-        fig = plt.figure(figsize=(8,8))
-        axs = []
-        for ii in range(0, errors.shape[2]):
-            axs.append(plt.subplot(1, errors.shape[2], ii+1, projection='3d'))
+def plot_error_3d_surf(theta, theta_p, errors, dt, prediction_dim_labs=('X', 'Y', 'Z'), save=False, label='', folder='Figures'):
+    """
+    Parameters
+    ----------
+    theta: float Optional (Default: max(theta_p))
+        size of window we are predicting
+    theta_p: float array
+        the times into the future zhat predictions are in [sec]
+    errors: float array
+        the errors returns from utils.calc_shifted_error (steps, len(theta_p), m),
+        where m is the number of output dims
+    """
+    if not os.path.exists(folder):
+        os.makedirs(folder)
+
+    time = np.linspace(0, errors.shape[0]*dt, errors.shape[0])
+
+    # Plot a 3d plot for each xyz output dim
+    # fig = plt.figure()
+    fig = plt.figure(figsize=(8,8))
+    axs = []
+    for ii in range(0, errors.shape[2]):
+        axs.append(plt.subplot(1, errors.shape[2], ii+1, projection='3d'))
+        plt.xlabel('Time [sec]')
+        plt.ylabel('Theta P [sec]')
+        plt.title(f'{prediction_dim_labs[ii]} Error')
+        X, Y = np.meshgrid(time, theta_p)
+        surf = axs[ii].plot_surface(X, Y, errors[:, :, ii].T,
+                cmap=cm.coolwarm, linewidth=0, antialiased=False)
+        axs[ii].zaxis.set_major_locator(LinearLocator(10))
+        # axs[ii].zaxis.set_major_formatter('{x:.02f}')
+        fig.colorbar(surf, shrink=0.5, aspect=5)
+
+    if save:
+        plt.savefig(f'{folder}/{label}3d_error_heat_map.jpg')
+    plt.show()
+
+def plot_error_heatmap_subplot_dims(theta, theta_p, errors, dt, prediction_dim_labs=('X', 'Y', 'Z'), save=False, label='', folder='Figures'):
+    """
+    Parameters
+    ----------
+    theta: float Optional (Default: max(theta_p))
+        size of window we are predicting
+    theta_p: float array
+        the times into the future zhat predictions are in [sec]
+    errors: float array
+        the errors returns from utils.calc_shifted_error (steps, len(theta_p), m),
+        where m is the number of output dims
+    """
+    if not os.path.exists(folder):
+        os.makedirs(folder)
+
+    time = np.linspace(0, errors.shape[0]*dt, errors.shape[0])
+
+    # Plot a 2d heat map of the above
+    fig = plt.figure()
+    axs = []
+    for ii in range(0, errors.shape[2]+1):
+        axs.append(plt.subplot(errors.shape[2]+1, 1, ii+1))
+        if ii < errors.shape[2]:
             plt.xlabel('Time [sec]')
             plt.ylabel('Theta P [sec]')
-            plt.title(f'{prediction_dim_labs[ii]} Error')
+            plt.title(f'{prediction_dim_labs[ii]} Error | theta={theta}')
             X, Y = np.meshgrid(time, theta_p)
-            surf = axs[ii].plot_surface(X, Y, errors[:, :, ii].T,
-                    cmap=cm.coolwarm, linewidth=0, antialiased=False)
-            axs[ii].zaxis.set_major_locator(LinearLocator(10))
-            # axs[ii].zaxis.set_major_formatter('{x:.02f}')
-            fig.colorbar(surf, shrink=0.5, aspect=5)
-        # plt.show()
+            axs[ii].pcolormesh(X, Y, errors[:, :, ii].T)
+        else:
+            plt.xlabel('Time [sec]')
+            plt.ylabel('Theta P [sec]')
+            plt.title(f'2norm Error | theta={theta}')
+            X, Y = np.meshgrid(time, theta_p)
+            axs[ii].pcolormesh(X, Y, np.linalg.norm(errors, axis=2).T)
 
-        if save:
-            plt.savefig(f'{folder}/{label}3d_error_heat_map.jpg')
+        # surf = axs[ii].plot_surface(X, Y, errors[:, :, ii].T,
+        #         cmap=cm.coolwarm, linewidth=0, antialiased=False)
+        # axs[ii].zaxis.set_major_locator(LinearLocator(10))
+        # axs[ii].zaxis.set_major_formatter('{x:.02f}')
+        # fig.colorbar(surf, shrink=0.5, aspect=5)
+
+    if save:
+        plt.savefig(f'{folder}/{label}2d_error_heat_map.jpg')
+    plt.show()
+
+def plot_mean_thetap_error_subplot_dims(theta, theta_p, errors, dt, prediction_dim_labs=('X', 'Y', 'Z'), save=False, label='', folder='Figures'):
+    """
+    Parameters
+    ----------
+    theta: float Optional (Default: max(theta_p))
+        size of window we are predicting
+    theta_p: float array
+        the times into the future zhat predictions are in [sec]
+    errors: float array
+        the errors returns from utils.calc_shifted_error (steps, len(theta_p), m),
+        where m is the number of output dims
+    """
+    if not os.path.exists(folder):
+        os.makedirs(folder)
+
+    time = np.linspace(0, errors.shape[0]*dt, errors.shape[0])
+
+    # Plot avg error over time, averaging over theta_p
+    plt.figure(figsize=(8,12))
+    axs = []
+    for ii in range(0, errors.shape[2]+1):
+        axs.append(plt.subplot(errors.shape[2]+1, 1, ii+1))
+        if ii < errors.shape[2]:
+            plt.title("Error over Time")
+            plt.xlabel('Time [sec]')
+            plt.ylabel(f'{prediction_dim_labs[ii]} Mean Error Over Theta_P')
+            axs[ii].plot(time, np.mean(errors[:, :, ii], axis=1))
+        else:
+            plt.title("Error over Time")
+            plt.xlabel('Time [sec]')
+            plt.ylabel(f'2norm Error of Mean Over Theta_P')
+            axs[ii].plot(time, np.linalg.norm(np.mean(errors, axis=1), axis=1))
+
+    if save:
+        plt.savefig(f'{folder}/{label}error_over_time_avg_tp.jpg')
+    plt.show()
 
 
-        # Plot a 2d heat map of the above
-        fig = plt.figure()
-        axs = []
-        for ii in range(0, errors.shape[2]+1):
-            axs.append(plt.subplot(errors.shape[2]+1, 1, ii+1))
-            if ii < errors.shape[2]:
-                plt.xlabel('Time [sec]')
-                plt.ylabel('Theta P [sec]')
-                plt.title(f'{prediction_dim_labs[ii]} Error | theta={theta}')
-                X, Y = np.meshgrid(time, theta_p)
-                axs[ii].pcolormesh(X, Y, errors[:, :, ii].T)
-            else:
-                plt.xlabel('Time [sec]')
-                plt.ylabel('Theta P [sec]')
-                plt.title(f'2norm Error | theta={theta}')
-                X, Y = np.meshgrid(time, theta_p)
-                axs[ii].pcolormesh(X, Y, np.linalg.norm(errors, axis=2).T)
 
-            # surf = axs[ii].plot_surface(X, Y, errors[:, :, ii].T,
-            #         cmap=cm.coolwarm, linewidth=0, antialiased=False)
-            # axs[ii].zaxis.set_major_locator(LinearLocator(10))
-            # axs[ii].zaxis.set_major_formatter('{x:.02f}')
-            # fig.colorbar(surf, shrink=0.5, aspect=5)
+def plot_alpha_theta_p_error_subplot_dims(theta, theta_p, errors, dt, prediction_dim_labs=('X', 'Y', 'Z'), save=False, label='', folder='Figures'):
+    """
+    Parameters
+    ----------
+    theta: float Optional (Default: max(theta_p))
+        size of window we are predicting
+    theta_p: float array
+        the times into the future zhat predictions are in [sec]
+    errors: float array
+        the errors returns from utils.calc_shifted_error (steps, len(theta_p), m),
+        where m is the number of output dims
+    """
+    if not os.path.exists(folder):
+        os.makedirs(folder)
 
-        if save:
-            plt.savefig(f'{folder}/{label}2d_error_heat_map.jpg')
-
-
-        # Plot avg error over time, averaging over theta_p
-        plt.figure(figsize=(8,12))
-        axs = []
-        for ii in range(0, errors.shape[2]+1):
-            axs.append(plt.subplot(errors.shape[2]+1, 1, ii+1))
-            if ii < errors.shape[2]:
-                plt.title("Error over Time")
-                plt.xlabel('Time [sec]')
-                plt.ylabel(f'{prediction_dim_labs[ii]} Mean Error Over Theta_P')
-                axs[ii].plot(time, np.mean(errors[:, :, ii], axis=1))
-            else:
-                plt.title("Error over Time")
-                plt.xlabel('Time [sec]')
-                plt.ylabel(f'2norm Error of Mean Over Theta_P')
-                axs[ii].plot(time, np.linalg.norm(np.mean(errors, axis=1), axis=1))
-
-        if save:
-            plt.savefig(f'{folder}/{label}error_over_time_avg_tp.jpg')
+    time = np.linspace(0, errors.shape[0]*dt, errors.shape[0])
 
     # Plot avg error over time, showing each theta_p line
     plt.figure(figsize=(8,12))
@@ -281,27 +354,56 @@ def plot_error(theta_p, errors, dt, prediction_dim_labs=('X', 'Y', 'Z'), theta=N
                 axs[ii].plot(time, np.linalg.norm(errors[:, tp, :], axis=1), alpha=alpha, label=f"{_theta_p}")#, c='r')
         plt.legend(loc=1)
 
-    # plt.show()
-
     if save:
         plt.savefig(f'{folder}/{label}error_over_time.jpg')
+        print(f'Save figure to {folder}/{label}error_over_time.jpg')
+    plt.show()
+
+
+def plot_mean_time_error_vs_theta_p(
+        theta, theta_p, errors, dt, prediction_dim_labs=('X', 'Y', 'Z'), save=False, label='', folder='Figures',
+        figure=None, axs=None, show=False, legend_label=None, linestyle='-'):
+    """
+    Parameters
+    ----------
+    theta: float Optional (Default: max(theta_p))
+        size of window we are predicting
+    theta_p: float array
+        the times into the future zhat predictions are in [sec]
+    errors: float array
+        the errors returns from utils.calc_shifted_error (steps, len(theta_p), m),
+        where m is the number of output dims
+    """
+    if not os.path.exists(folder):
+        os.makedirs(folder)
+
+    time = np.linspace(0, errors.shape[0]*dt, errors.shape[0])
 
     # Plot avg error over theta_p, averaging over time
-    if len(theta_p) > 1:
-        plt.figure(figsize=(8,12))
+    if figure is None:
+        figure = plt.figure(figsize=(8,12))
+    if axs is None:
         axs = []
-        for ii in range(0, errors.shape[2]):
+        gen_axs = True
+    else:
+        gen_axs = False
+    for ii in range(0, errors.shape[2]):
+        if gen_axs:
             axs.append(plt.subplot(errors.shape[2], 1, ii+1))
-            plt.title("Error over Theta_P")
-            plt.xlabel('Theta_P [sec]')
-            plt.ylabel(f'{prediction_dim_labs[ii]} Mean Error Over Time')
-            axs[ii].plot(theta_p, np.mean(errors[:, :, ii], axis=0))
+        axs[ii].set_title("Error over Theta_P")
+        axs[ii].set_xlabel('Theta_P [sec]')
+        axs[ii].set_ylabel(f'{prediction_dim_labs[ii]} Mean Error Over Time')
+        axs[ii].plot(theta_p, np.mean(errors[:, :, ii], axis=0), label=legend_label, linestyle=linestyle)
+        axs[ii].legend()
 
-        if save:
-            plt.savefig(f'{folder}/{label}error_over_tp.jpg')
+    if save:
+        plt.savefig(f'{folder}/{label}error_over_tp.jpg')
+        print(f'Save figure to {folder}/{label}error_over_tp.jpg')
 
-    if not save:
+    if show:
+        print('showing fig')
         plt.show()
+    return figure, axs
 
 def plot_ldn_repr_error(error, theta, theta_p, z, dt, zhats, prediction_dim_labs=None, save_name=None, folder='data/figures/', max_rows=4, dim_labels=None):
     """

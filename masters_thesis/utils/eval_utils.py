@@ -2,6 +2,7 @@
 # matplotlib.use('TkAgg')
 
 import numpy as np
+import copy
 import nengo
 from tqdm import tqdm
 from masters_thesis.network.ldn import LDN
@@ -342,10 +343,10 @@ def clipOutliers(arr, outlierConstant=1.7):
 
 def load_data_from_json(json_params):
     # split into separate dicts for easier use
-    data_params = json_params['data']
-    llp_params = json_params['llp']
-    params = json_params['general']
-    ens_args = json_params['ens_args']
+    data_params = copy.deepcopy(json_params['data'])
+    llp_params = copy.deepcopy(json_params['llp'])
+    params = copy.deepcopy(json_params['general'])
+    ens_args = copy.deepcopy(json_params['ens_args'])
 
     # get the neuron model object to match the string in the param file
     model_str = llp_params['neuron_model']
@@ -484,12 +485,13 @@ def load_data_from_json(json_params):
     llp_params['size_c'] = len(data_params['c_dims']) + len(data_params['u_dims'])
     llp_params['size_z'] = len(data_params['z_dims'])
 
-    json_params['data'] = data_params
-    json_params['llp'] = llp_params
-    json_params['general'] = params
-    json_params['ens_args'] = ens_args
+    loaded_json_params = {}
+    loaded_json_params['data'] = data_params
+    loaded_json_params['llp'] = llp_params
+    loaded_json_params['general'] = params
+    loaded_json_params['ens_args'] = ens_args
 
-    return json_params, c_state, z_state, times
+    return loaded_json_params, c_state, z_state, times
 
 if __name__ == '__main__':
     q=5

@@ -362,7 +362,7 @@ def plot_alpha_theta_p_error_subplot_dims(theta, theta_p, errors, dt, prediction
 
 def plot_mean_time_error_vs_theta_p(
         theta, theta_p, errors, dt, prediction_dim_labs=('X', 'Y', 'Z'), save=False, label='', folder='Figures',
-        figure=None, axs=None, show=False, legend_label=None, linestyle='-'):
+        figure=None, axs=None, show=False, legend_label=None, linestyle='-', title=None, all_constants=None):
     """
     Parameters
     ----------
@@ -381,26 +381,68 @@ def plot_mean_time_error_vs_theta_p(
 
     # Plot avg error over theta_p, averaging over time
     if figure is None:
-        figure = plt.figure(figsize=(8,12))
+        figure = plt.figure(figsize=(12,10))
     if axs is None:
         axs = []
         gen_axs = True
     else:
         gen_axs = False
+
+    if title is None:
+        "Error over Theta_P"
     for ii in range(0, errors.shape[2]):
         if gen_axs:
             axs.append(plt.subplot(errors.shape[2], 1, ii+1))
-        axs[ii].set_title("Error over Theta_P")
+        axs[ii].set_title(title)
         axs[ii].set_xlabel('Theta_P [sec]')
         axs[ii].set_ylabel(f'{prediction_dim_labs[ii]} Mean Error Over Time')
         axs[ii].plot(theta_p, np.mean(errors[:, :, ii], axis=0), label=legend_label, linestyle=linestyle)
         axs[ii].legend()
+        if all_constants is not None:
+            # def print_nested(d, indent=0):
+            #     for key, value in d.items():
+            #         if isinstance(value, dict):
+            #             print('\t' * indent + str(key) + ': ')
+            #             print_nested(value, indent+1)
+            #         else:
+            #             print('\t' * indent + str(key) + f': {value}')
+            #
+            # print_nested(all_constants)
+
+            def dict_nested2str(d, indent=4, _recursive_call=False):
+                str_dict = ''
+                if _recursive_call:
+                    internal_indent = indent
+                else:
+                    internal_indent = 0
+                print('internal: ', internal_indent)
+                for key, value in d.items():
+                    if isinstance(value, dict):
+                        str_dict += '\n' + ' ' * internal_indent + str(key) + ': '
+                        # str_dict += str(key) + ": "
+                        # str_dict += '-woah-' + str(value)
+                        str_dict += dict_nested2str(value, indent*2, _recursive_call=True)
+                    else:
+                        str_dict += '\n' + ' ' * internal_indent + str(key) + f': {value}'
+                return str_dict
+
+            axs[ii].text(
+                1.1, 0.12,
+                ('Constant Parameters\n'
+                +'___________________\n'
+                + dict_nested2str(all_constants)),
+                fontsize=8
+            )
+            plt.grid(True)
+            plt.subplots_adjust(right=0.6)
 
     if save:
+        plt.tight_layout()
         plt.savefig(f'{folder}/{label}error_over_tp.jpg')
         print(f'Save figure to {folder}/{label}error_over_tp.jpg')
 
     if show:
+        plt.tight_layout()
         print('showing fig')
         plt.show()
     return figure, axs

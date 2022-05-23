@@ -380,7 +380,7 @@ def run_variation_comparison(json_fps, variation_dict, show_prediction=False, sa
 
     figure = None
     axs = None
-    script_name = 'nef_decode_llp_weight_TEST2'
+    script_name = 'nef_decode_llp_weight_TEST3'
 
     for jj, json_fp in enumerate(json_fps):
         with open(json_fp) as fp:
@@ -677,45 +677,46 @@ if __name__ == '__main__':
 
 
     # NOTE Current implementation for running experiment variations
-    # json_fps = [
-    #     'parameter_sets/params_0016a.json',
-    #     # 'parameter_sets/params_0016b.json',
-    # ]
-    #
-    # # for json_fp in json_fps:
-    # run_variation_comparison(
-    #     json_fps=json_fps,
-    #     # key_list=['llp', 'n_neurons'],
-    #     # variation_list=[1000, 2000, 5000],
-    #     variation_dict = {
-    #         # 'llp/n_neurons': [1000, 2500, 5000],
-    #         'llp/theta': [1, 0.1],
-    #         # 'llp/q': [2, 4, 6, 8],
-    #         # 'data/q_u': [1, 2],
-    #     },
-    #     # labels=['1000', '2000', '5000'],
-    #     show_prediction=False,
-    #     save=True,
-    # )
+    json_fps = [
+        'parameter_sets/params_0016a.json',
+        # 'parameter_sets/params_0016b.json',
+    ]
+
+    # for json_fp in json_fps:
+    run_variation_comparison(
+        json_fps=json_fps,
+        # key_list=['llp', 'n_neurons'],
+        # variation_list=[1000, 2000, 5000],
+        variation_dict = {
+            'llp/n_neurons': [1000, 5000, 10000],
+            'llp/theta': [1, 0.1],
+            'llp/q': [1, 2, 3, 4],
+            'data/q_u': [1, 2, 3],
+            'data/theta_u': [0.5, 1, 2, 3, 5]
+        },
+        # labels=['1000', '2000', '5000'],
+        show_prediction=False,
+        save=True,
+    )
 
     # NOTE Current implementation for loading results and plotting
-    script_name = 'nef_decode_llp_weight_TEST2'
-    const_params = {
-        # 'llp/q': 2,
-        'data/dataset_range': [80000, 100000],
-        # 'llp/theta': 1,
-        # 'llp/n_neurons': 5000
-    }
-    const_params = None
-    db_name = 'llp_pd_d_results'
-    db_folder = '/home/pjaworsk/src/masters/masters_thesis/masters_thesis/data/databases'
-
-    load_results(
-        script_name=script_name,
-        const_params=const_params,
-        db_name=db_name,
-        db_folder=db_folder,
-        ignore_keys=['general/theta_p'],
-        show_gt=True,
-        show_prediction=False
-    )
+    # script_name = 'nef_decode_llp_weight_TEST3'
+    # const_params = {
+    #     # 'llp/q': 2,
+    #     'data/dataset_range': [80000, 100000],
+    #     # 'llp/theta': 1,
+    #     # 'llp/n_neurons': 5000
+    # }
+    # const_params = None
+    # db_name = 'llp_pd_d_results'
+    # db_folder = '/home/pjaworsk/src/masters/masters_thesis/masters_thesis/data/databases'
+    #
+    # load_results(
+    #     script_name=script_name,
+    #     const_params=const_params,
+    #     db_name=db_name,
+    #     db_folder=db_folder,
+    #     ignore_keys=['general/theta_p'],
+    #     show_gt=True,
+    #     show_prediction=False
+    # )

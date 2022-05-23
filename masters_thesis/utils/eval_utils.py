@@ -87,6 +87,7 @@ def decode_ldn_data(Z, q, theta, theta_p=None):
 
 
 def RMSE(x, xhat):
+    print('---RMSE DEBUG---')
     print('x: ', x.shape)
     print('xhat: ', xhat.shape)
     err = 0

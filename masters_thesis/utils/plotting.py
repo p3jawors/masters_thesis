@@ -362,7 +362,8 @@ def plot_alpha_theta_p_error_subplot_dims(theta, theta_p, errors, dt, prediction
 
 def plot_mean_time_error_vs_theta_p(
         theta, theta_p, errors, dt, prediction_dim_labs=('X', 'Y', 'Z'), save=False, label='', folder='Figures',
-        figure=None, axs=None, show=False, legend_label=None, linestyle='-', title=None, all_constants=None):
+        figure=None, axs=None, show=False, legend_label=None, linestyle='-', title=None, all_constants=None,
+        errors_gt=None):
     """
     Parameters
     ----------
@@ -397,7 +398,14 @@ def plot_mean_time_error_vs_theta_p(
         axs[ii].set_xlabel('Theta_P [sec]')
         axs[ii].set_ylabel(f'{prediction_dim_labs[ii]} Mean Error Over Time')
         axs[ii].plot(theta_p, np.mean(errors[:, :, ii], axis=0), label=legend_label, linestyle=linestyle)
-        axs[ii].legend()
+        if errors_gt is not None:
+            axs[ii].plot(
+                theta_p,
+                np.mean(errors_gt[:, :, ii], axis=0),
+                label='GT_' + legend_label,
+                linestyle='--'
+            )
+        axs[ii].legend(loc='center left', bbox_to_anchor=(1, 0.75), fontsize=8)
         if all_constants is not None:
             # def print_nested(d, indent=0):
             #     for key, value in d.items():
@@ -427,7 +435,7 @@ def plot_mean_time_error_vs_theta_p(
                 return str_dict
 
             axs[ii].text(
-                1.1, 0.12,
+                1.1, 0,
                 ('Constant Parameters\n'
                 +'___________________\n'
                 + dict_nested2str(all_constants)),
@@ -708,13 +716,29 @@ def plot_data_distribution(dat_arr, dim_labels=None, bins=None, n_rows=4, save_n
     if show:
         plt.show()
 
+def plot_sliding_distance(positions, dt, theta):
+    theta_p = np.linspace(dt, theta, 10)
+    distances = []
+    for tp in theta_p:
+        tp_steps = int(tp/dt)
+        # print('tp: ', tp)
+        # print('tp steps: ', tp_steps)
+        dists = []
+        # print('pos shape: ', positions.shape)
+        for pp in range(0, positions.shape[0]):
+            if pp + tp_steps >= positions.shape[0]:
+                continue
+            dists.append(np.linalg.norm(positions[pp+tp_steps] - positions[pp]))
+        distances.append(np.mean(dists))
+        # print('dists: ', dists)
+    plt.figure()
+    plt.plot(theta_p, distances)
+    plt.show()
 
 if __name__ == '__main__':
-    from abr_analyze import DataHandler
-
     dat = DataHandler('llp_pd', 'data/databases')
-    data = dat.load(save_location='100_linear_targets', parameters=['state', 'target', 'time'])
-    plot_traj_error(data['time'], data['state'], data['target'])
+    # data = dat.load(save_location='100_linear_targets', parameters=['state', 'target', 'time'])
+    # plot_traj_error(data['time'], data['state'], data['target'])
 
     # plot_2d(
     #     data['time'],

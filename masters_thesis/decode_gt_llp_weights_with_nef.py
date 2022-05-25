@@ -112,6 +112,38 @@ def run(json_params, weights=None):
 
     return(RMSE(tgt, decoded), eval_pt, tgt, decoded, weights, z_state)
 
+def gen_lookup_table(db_name, db_folder):
+    dat = DataHandler(
+        db_name=db_name,
+        database_dir=db_folder
+    )
+
+    hashes = dat.load(
+        save_location="params",
+        parameters=dat.get_keys("params")
+    )
+    lookup = {}
+    for hash_id in hashes:
+        params = dat.load(
+            save_location=f"params/{hash_id}",
+            parameters=dat.get_keys(f"params/{hash_id}", recursive=True)
+        )
+        for key, val in params.items():
+            # print(key)
+            # print(val)
+            # raise Exception
+            if key not in lookup:
+                lookup[key] = {str(val): [hash_id]}
+            elif str(val) not in lookup[key].keys():
+                lookup[key][str(val)] = [hash_id]
+            elif str(val) in lookup[key].keys():
+                lookup[key][str(val)].append(hash_id)
+    # print('KEY: ', key)
+    # print('len: ', len(lookup[key]['1']))
+    # print('unique: ', len(set(lookup[key]['1'])))
+    # print_nested(lookup[key])
+    return lookup
+
 
 def load_results(
         script_name,
@@ -210,8 +242,17 @@ def load_results(
             for param_key in const_params.keys():
 
                 if isinstance(data[param_key], (list, np.ndarray)):
-                    if (data[param_key] != const_params[param_key]).any():
-                        num_diff += 1
+                    try:
+                        # print(param_key)
+                        if np.asarray(data[param_key]).shape != np.asarray(const_params[param_key]).shape:
+                            num_diff += 1
+                        elif (data[param_key] != const_params[param_key]).any():
+                            num_diff += 1
+                    except AttributeError as e:
+                        print(f"Got AttributeError on {param_key} who's value is:\n{data[param_key]}")
+                        print(f"Or possibly from const params:\n{const_params[param_key]}")
+                        raise e
+
                 else:
                     if data[param_key] != const_params[param_key]:
                         num_diff += 1
@@ -304,7 +345,7 @@ def load_results(
         x = data['decoded_z']
         xhat = data['decoded_zhat']
         if show_gt:
-            RMSE_gt = data['RMSE_gt']
+            RMSE_gt = data['RMSE_gt'][:, :, np.newaxis]
         else:
             RMSE_gt = None
 
@@ -316,6 +357,33 @@ def load_results(
             constants_printout = all_constants
             print('saving image this time')
         show = save_fig
+
+        if show_prediction:
+            # print('showing prediction')
+            pred_data = dat.load(
+                save_location=f'params/{match}',
+                parameters=['llp/q', 'llp/theta', 'general/dt']
+            )
+
+            plot_prediction_vs_gt(
+                tgt=target_pts,
+                decoded=decoded_pts,
+                q=pred_data['llp/q'],
+                theta=pred_data['llp/theta'],
+                # theta_p = np.linspace(
+                #         pred_data['general/dt'],
+                #         pred_data['llp/theta'],
+                #         10
+                # ),
+                theta_p=[1],
+                z_state=z_state,#[theta_steps:]
+                # xlim=[0, 1000],
+                show=False,
+                save=False,
+                # savename=f"data/pred_vs_gt_q_{json_params['llp']['q']}.jpg"
+            )
+
+
         # print('Plotting')
         figure, axs = plotting.plot_mean_time_error_vs_theta_p(
             theta_p = np.linspace(
@@ -335,32 +403,8 @@ def load_results(
             folder='data',
             label="",#f"{save_name.replace('.', '_').replace('/', '_')}_"
             all_constants=constants_printout,
-            errors_gt=RMSE_gt[:, :, np.newaxis],
+            errors_gt=RMSE_gt,
         )
-        if show_prediction:
-            pred_data = dat.load(
-                save_location=f'params/{match}',
-                parameters=['llp/q', 'llp/theta', 'general/dt']
-            )
-
-            plot_prediction_vs_gt(
-                tgt=target_pts,
-                decoded=decoded_pts,
-                q=pred_data['llp/q'],
-                theta=pred_data['llp/theta'],
-                theta_p = np.linspace(
-                        pred_data['general/dt'],
-                        pred_data['llp/theta'],
-                        10
-                ),
-                z_state=z_state,#[theta_steps:]
-                # xlim=[0, 1000],
-                show=False,
-                save=False,
-                # savename=f"data/pred_vs_gt_q_{json_params['llp']['q']}.jpg"
-            )
-
-
 
 
 
@@ -415,16 +459,6 @@ def run_variation_comparison(json_fps, variation_dict, show_prediction=False, sa
             # save_name=f"{json_fp.split('/')[-1]}/{hash_name}/results"
             save_name=f"results/{script_name}/{hash_name}"
 
-            # save the altered parameters to the unique hash created from the altered json
-            if save:
-                dat.save(
-                    # save_location=f"{json_fp.split('/')[-1]}/{hash_name}/params",
-                    save_location=f"params/{hash_name}",
-                    data=json_params,
-                    overwrite=True,
-                    timestamp=False
-                )
-
 
             # print(f"Updated json_params by changing {key_list} to {var}\n{json_params}")
             print(f"hash_name: {hash_name}")
@@ -446,6 +480,16 @@ def run_variation_comparison(json_fps, variation_dict, show_prediction=False, sa
                 print('Getting test results')
                 json_params['data']['dataset_range'] = json_params['data']['test_range']
                 rmse, eval_pts, target_pts, decoded_pts, weights, z_state = run(json_params, weights=weights)
+
+                # save the altered parameters to the unique hash created from the altered json
+                if save:
+                    dat.save(
+                        # save_location=f"{json_fp.split('/')[-1]}/{hash_name}/params",
+                        save_location=f"params/{hash_name}",
+                        data=json_params,
+                        overwrite=True,
+                        timestamp=False
+                    )
 
                 print('Calculating RMSE for each theta_p')
                 n_steps = np.diff(json_params['data']['dataset_range'])[0] - theta_steps
@@ -678,45 +722,97 @@ if __name__ == '__main__':
 
     # NOTE Current implementation for running experiment variations
     json_fps = [
-        'parameter_sets/params_0016a.json',
+        # 'parameter_sets/params_0016a.json',
         # 'parameter_sets/params_0016b.json',
+        # 'parameter_sets/params_0018.json',
+        'parameter_sets/params_0019.json',
     ]
 
     # for json_fp in json_fps:
-    run_variation_comparison(
-        json_fps=json_fps,
-        # key_list=['llp', 'n_neurons'],
-        # variation_list=[1000, 2000, 5000],
-        variation_dict = {
-            'llp/n_neurons': [1000, 5000, 10000],
-            'llp/theta': [1, 0.1],
-            'llp/q': [1, 2, 3, 4],
-            'data/q_u': [1, 2, 3],
-            'data/theta_u': [0.5, 1, 2, 3, 5]
-        },
-        # labels=['1000', '2000', '5000'],
-        show_prediction=False,
-        save=True,
-    )
+    # run_variation_comparison(
+    #     json_fps=json_fps,
+    #     # key_list=['llp', 'n_neurons'],
+    #     # variation_list=[1000, 2000, 5000],
+    #     variation_dict = {
+    #         # 'llp/n_neurons': [25000, 50000],
+    #         'llp/theta': [1, 0.1],
+    #         'llp/q': [2, 3],
+    #         # 'data/q_c': [1, 2, 3],
+    #         # 'data/theta_c': [1,2,3,4,5]
+    #         'data/q_u': [1, 2, 3],
+    #         'data/theta_u': [1, 2, 3, 4, 5]
+    #     },
+    #     # labels=['1000', '2000', '5000'],
+    #     show_prediction=False,
+    #     save=True,
+    # )
 
     # NOTE Current implementation for loading results and plotting
-    # script_name = 'nef_decode_llp_weight_TEST3'
-    # const_params = {
-    #     # 'llp/q': 2,
-    #     'data/dataset_range': [80000, 100000],
-    #     # 'llp/theta': 1,
-    #     # 'llp/n_neurons': 5000
-    # }
+    script_name = 'nef_decode_llp_weight_TEST3'
+    const_params = {
+        # == Data ==
+        # "data/db_name": "llp_pd_d",
+        # "data/database_dir": "data/databases",
+        # "data/dataset": "9999_linear_targets_faster",
+        # "data/state_key": "mean_shifted_normalized_ego_error",
+        # "data/ctrl_key": "clean_u",
+        # "data/dataset_range": [0, 100000],
+        # "data/train_range": [0, 80000],
+        # "data/test_range": [80000, 100000],
+        # "data/c_dims": [0, 1, 2],
+        "data/q_c": 2,
+        "data/theta_c": 1,
+        # "data/z_dims": [0, 1, 2],
+        # "data/u_dims": [],
+        "data/q_u": 0,
+        "data/theta_u": 0,
+
+        # == llp ==
+        # "llp/model_type": "mine",
+        "llp/n_neurons": 1000,
+        "llp/theta": 1,
+        "llp/q": 2,
+        # "llp/q_a": 5,
+        # "llp/q_p": 2,
+        # "llp/learning_rate": 8.656205265024589e-7,
+        # "llp/neuron_model": "nengo.RectifiedLinear",
+
+        # == ens args ==
+        # "ens_args/seed": 0,
+        # "ens_args/radius": 1,
+
+        # == general ==
+        # "general/run_nni": false,
+        # "general/dt": 0.01,
+        # "general/theta_p": [1]
+    }
     # const_params = None
-    # db_name = 'llp_pd_d_results'
-    # db_folder = '/home/pjaworsk/src/masters/masters_thesis/masters_thesis/data/databases'
-    #
-    # load_results(
-    #     script_name=script_name,
-    #     const_params=const_params,
+    db_name = 'llp_pd_d_results'
+    db_folder = '/home/pjaworsk/src/masters/masters_thesis/masters_thesis/data/databases'
+
+    load_results(
+        script_name=script_name,
+        const_params=const_params,
+        db_name=db_name,
+        db_folder=db_folder,
+        ignore_keys=['general/theta_p', 'data/dataset_range'],
+        show_gt=False,
+        show_prediction=True
+    )
+
+    # lookup = gen_lookup_table(
     #     db_name=db_name,
     #     db_folder=db_folder,
-    #     ignore_keys=['general/theta_p'],
-    #     show_gt=True,
-    #     show_prediction=False
     # )
+    # param = 'llp/q'
+    # val = 2
+    # hashes = lookup[param][str(val)]
+    # dat = DataHandler(db_name, db_folder)
+    # for hash_id in hashes:
+    #     print('------')
+    #     print(f"{hash_id} has {param} with a value of {str(val)}")
+    #     print(dat.load(
+    #         save_location=f"params/{hash_id}",
+    #         parameters=[param]
+    #         )[param]
+    #     )

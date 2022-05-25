@@ -423,7 +423,7 @@ def plot_mean_time_error_vs_theta_p(
                     internal_indent = indent
                 else:
                     internal_indent = 0
-                print('internal: ', internal_indent)
+                # print('internal: ', internal_indent)
                 for key, value in d.items():
                     if isinstance(value, dict):
                         str_dict += '\n' + ' ' * internal_indent + str(key) + ': '

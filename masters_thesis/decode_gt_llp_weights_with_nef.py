@@ -13,13 +13,30 @@ endc = "\033[0m"
 green = "\033[92m"
 red = "\033[91m"
 
-def print_nested(d, indent=0):
+def print_nested(d, indent=0, return_val=False):
+    if return_val:
+        full_print = ''
     for key, value in d.items():
         if isinstance(value, dict):
-            print('\t' * indent + str(key) + ': ')
-            print_nested(value, indent+1)
+            line = '\t' * indent + str(key) + ': '
+            if return_val:
+                full_print += line
+            else:
+                print(line)
+            if return_val:
+                nested_line = print_nested(value, indent+1, return_val=return_val)
+                full_print += nested_line
+            else:
+                print_nested(value, indent+1)
         else:
-            print('\t' * indent + str(key) + f': {value}')
+            line = '\t' * indent + str(key) + f': {value}'
+            if return_val:
+                full_print += line
+            else:
+                print(line)
+
+    if return_val:
+        return full_print
 
 def run(json_params, weights=None):
     loaded_json_params, c_state, z_state, times = load_data_from_json(json_params)
@@ -145,6 +162,127 @@ def gen_lookup_table(db_name, db_folder):
     return lookup
 
 
+# def add_parameters(missing_param_dict, db_name, db_folder=None):
+#     dat = DataHandler(
+#         db_name=db_name,
+#         database_dir=db_folder
+#     )
+#     hash_ids = dat.load(save_location='params')
+def compare_all_keys(dat, saved_exp_hashes, parameter_stems):
+    """
+    Input a DataHandler object and list of experiment hashes and will
+    return a dictionary of constant parameters and a list of keys with
+    that differ between any of the experiments. The differing values
+    are to be used as legend keys to differentiate between experiments.
+    The constant parameters can be printed alongside the figure.
+
+
+    Saving format
+    params  >hash_0 >parameter in json format
+            >hash_1 >parameter in json format
+            >hash_2 >parameter in json format
+
+    results >script_0   >hash_0 >results_dict
+                        >hash_2 >results_dict
+            >script_1   >hash_1 >results_dict
+    """
+    if isinstance(parameter_stems, str):
+        parameter_stems = [parameter_stems]
+
+    final_legend = []
+    final_constants = {}
+
+    for group_name in parameter_stems:
+        for ee, exp_hash in enumerate(saved_exp_hashes):
+            # print(f"ee: {ee}")
+            keys = dat.get_keys(f"params/{exp_hash}/{group_name}")
+            # track any differing values keys'
+            legend_keys = []
+            if ee == 0:
+                base_parameters = dat.load(save_location=f"params/{exp_hash}/{group_name}", parameters=keys)
+            else:
+                new_parameters = dat.load(save_location=f"params/{exp_hash}/{group_name}", parameters=keys)
+                # temporary storage of differing keys to add to legend keys
+                differing_keys = []
+                for key in base_parameters:
+                    if isinstance(base_parameters[key], (list, np.ndarray)):
+                        try:
+                            # if (base_parameters[key] != new_parameters[key]).any():
+                            #     differing_keys.append(key)
+
+                            if np.asarray(base_parameters[key]).shape != np.asarray(new_parameters[key]).shape:
+                                differing_keys.append(key)
+                            elif (base_parameters[key] != new_parameters[key]).any():
+                                differing_keys.append(key)
+
+                        except AttributeError as e:
+                            print(f"Got AttributeError on {key} who's value is:\n{base_parameters[key]}")
+                            print(f"Or possibly from const params:\n{new_parameters[key]}")
+                            raise e
+
+
+                    else:
+                        if key not in new_parameters.keys():
+                            new_parameters[key] = None
+                        if base_parameters[key] != new_parameters[key]:
+                            differing_keys.append(key)
+
+                # add missing keys directly to legend keys
+                for key in new_parameters:
+                    if key not in base_parameters.keys():
+                        legend_keys.append(f"{group_name}/{key}")
+
+                # remove differing keys from base parameters, only leaving common ones
+                for key in differing_keys:
+                    base_parameters.pop(key)
+                    legend_keys.append(f"{group_name}/{key}")
+
+        final_constants[group_name] = base_parameters
+        final_legend += legend_keys
+    # print('FINAL LEGEND: ', final_legend)
+    # print('''should match:
+    #     variation_dict = {
+    #         'llp/n_neurons': [1000, 2500, 5000],
+    #         'llp/theta': [1, 0.1],
+    #         'llp/q': [2, 4, 6, 8],
+    #         'data/q_u': [1, 2],
+    #     },
+    #     ''')
+    # raise Exception
+    return final_constants, final_legend
+
+def find_matches(dat, saved_exp_hashes, const_params):
+    matches = []
+    for exp_hash in saved_exp_hashes:
+        data = dat.load(save_location=f"params/{exp_hash}", parameters=const_params.keys())
+        # count the number of different key: value pairs, if zero save the hash
+        # since looking for experiments with matching parameters
+        num_diff = 0
+        for param_key in const_params.keys():
+
+            if isinstance(data[param_key], (list, np.ndarray)):
+                try:
+                    # print(param_key)
+                    if np.asarray(data[param_key]).shape != np.asarray(const_params[param_key]).shape:
+                        num_diff += 1
+                    elif (data[param_key] != const_params[param_key]).any():
+                        num_diff += 1
+                except AttributeError as e:
+                    print(f"Got AttributeError on {param_key} who's value is:\n{data[param_key]}")
+                    print(f"Or possibly from const params:\n{const_params[param_key]}")
+                    raise e
+
+            else:
+                if data[param_key] != const_params[param_key]:
+                    num_diff += 1
+            # print(data[param_key])
+            # print(type(data[param_key]))
+        if num_diff == 0:
+            matches.append(exp_hash)
+    print(f"{len(matches)} experiment hashes with matching parameters")
+    return matches
+
+
 def load_results(
         script_name,
         const_params,
@@ -161,107 +299,6 @@ def load_results(
     # Load the hashes of all experiments that have been run for this script
     saved_exp_hashes = dat.get_keys(f"results/{script_name}")
     print(f"{len(saved_exp_hashes)} experiments found with results from {script_name}")
-
-    def compare_all_keys(dat, saved_exp_hashes, parameter_stems):
-        """
-        Input a DataHandler object and list of experiment hashes and will
-        return a dictionary of constant parameters and a list of keys with
-        that differ between any of the experiments. The differing values
-        are to be used as legend keys to differentiate between experiments.
-        The constant parameters can be printed alongside the figure.
-
-
-        Saving format
-        params  >hash_0 >parameter in json format
-                >hash_1 >parameter in json format
-                >hash_2 >parameter in json format
-
-        results >script_0   >hash_0 >results_dict
-                            >hash_2 >results_dict
-                >script_1   >hash_1 >results_dict
-        """
-        if isinstance(parameter_stems, str):
-            parameter_stems = [parameter_stems]
-
-        final_legend = []
-        final_constants = {}
-
-        for group_name in parameter_stems:
-            for ee, exp_hash in enumerate(saved_exp_hashes):
-                # print(f"ee: {ee}")
-                keys = dat.get_keys(f"params/{exp_hash}/{group_name}")
-                # track any differing values keys'
-                legend_keys = []
-                if ee == 0:
-                    base_parameters = dat.load(save_location=f"params/{exp_hash}/{group_name}", parameters=keys)
-                else:
-                    new_parameters = dat.load(save_location=f"params/{exp_hash}/{group_name}", parameters=keys)
-                    # temporary storage of differing keys to add to legend keys
-                    differing_keys = []
-                    for key in base_parameters:
-                        # print(key)
-                        # print(base_parameters[key])
-                        if isinstance(base_parameters[key], (list, np.ndarray)):
-                            if (base_parameters[key] != new_parameters[key]).any():
-                                differing_keys.append(key)
-                        else:
-                            if base_parameters[key] != new_parameters[key]:
-                                differing_keys.append(key)
-
-                    # add missing keys directly to legend keys
-                    for key in new_parameters:
-                        if key not in base_parameters.keys():
-                            legend_keys.append(f"{group_name}/{key}")
-
-                    # remove differing keys from base parameters, only leaving common ones
-                    for key in differing_keys:
-                        base_parameters.pop(key)
-                        legend_keys.append(f"{group_name}/{key}")
-
-            final_constants[group_name] = base_parameters
-            final_legend += legend_keys
-        # print('FINAL LEGEND: ', final_legend)
-        # print('''should match:
-        #     variation_dict = {
-        #         'llp/n_neurons': [1000, 2500, 5000],
-        #         'llp/theta': [1, 0.1],
-        #         'llp/q': [2, 4, 6, 8],
-        #         'data/q_u': [1, 2],
-        #     },
-        #     ''')
-        # raise Exception
-        return final_constants, final_legend
-
-    def find_matches(dat, saved_exp_hashes, const_params):
-        matches = []
-        for exp_hash in saved_exp_hashes:
-            data = dat.load(save_location=f"params/{exp_hash}", parameters=const_params.keys())
-            # count the number of different key: value pairs, if zero save the hash
-            # since looking for experiments with matching parameters
-            num_diff = 0
-            for param_key in const_params.keys():
-
-                if isinstance(data[param_key], (list, np.ndarray)):
-                    try:
-                        # print(param_key)
-                        if np.asarray(data[param_key]).shape != np.asarray(const_params[param_key]).shape:
-                            num_diff += 1
-                        elif (data[param_key] != const_params[param_key]).any():
-                            num_diff += 1
-                    except AttributeError as e:
-                        print(f"Got AttributeError on {param_key} who's value is:\n{data[param_key]}")
-                        print(f"Or possibly from const params:\n{const_params[param_key]}")
-                        raise e
-
-                else:
-                    if data[param_key] != const_params[param_key]:
-                        num_diff += 1
-                # print(data[param_key])
-                # print(type(data[param_key]))
-            if num_diff == 0:
-                matches.append(exp_hash)
-        print(f"Experiment hashes with matching parameters:\n{matches}")
-        return matches
 
     # if isinstance(const_params, list) or isinstance(const_params, np.ndarray):
     if const_params is not None:
@@ -385,6 +422,10 @@ def load_results(
 
 
         # print('Plotting')
+        # title = f"Error over Theta_p\n{const_params}"
+        title = "Error over Theta_p"
+        # if len(title) > 30:
+        #     title = '\n'.join(x for x in title.split(','))
         figure, axs = plotting.plot_mean_time_error_vs_theta_p(
             theta_p = np.linspace(
                     params['general/dt'],
@@ -395,7 +436,7 @@ def load_results(
             dt=params['general/dt'],
             theta=params['llp/theta'],
             figure=figure,
-            title=f"Error over Theta_p | {const_params}",
+            title=title,
             axs=axs,
             show=show,
             legend_label=name,
@@ -414,7 +455,7 @@ def load_results(
     # TODO add auto legend and text to show differences in legend, constants in sidebar
 
 
-def run_variation_comparison(json_fps, variation_dict, show_prediction=False, save=False, load=False):
+def run_variation_comparison(json_fps, variation_dict=None, show_error=False, show_prediction=False, save=False, load=False):
 
     # for changing nested values
     def nested_set(dic, keys, value):
@@ -436,26 +477,22 @@ def run_variation_comparison(json_fps, variation_dict, show_prediction=False, sa
                 database_dir=json_params['data']['database_dir']
             )
 
-            # dat.save(
-            #     save_location=json_fp.split('/')[-1] + '/params',
-            #     data=json_params,
-            #     overwrite=True,
-            #     timestamp=False
-            # )
+        if variation_dict is None:
+            variations = [{}]
+        else:
+            variations = [dict(zip(variation_dict, v)) for v in product(*variation_dict.values())]
 
-        variations = [dict(zip(variation_dict, v)) for v in product(*variation_dict.values())]
         print(f"\nRunning {len(variations)} variations of test\n")
         for vv, var in enumerate(variations):
-            # save_name = ''
-            # save_name = '/'.join(key_list)
-            # save_name = json_fp.split('/')[-1] + '/results/' + save_name + '/' + str(var)
-
-            name = ""
-            for key in var:
-                nested_set(json_params, key.split('/'), var[key])
-                name += f"{key.split('/')[-1]}={var[key]} |"
+            if len(var) > 0:
+                name = ""
+                for key in var:
+                    nested_set(json_params, key.split('/'), var[key])
+                    name += f"{key.split('/')[-1]}={var[key]} |"
+            else:
+                name = json_fp
             # nested_set(json_params, key_list, var)
-            hash_name = hashlib.sha256(str(json_params).replace(' ', '').encode('utf-8')).hexdigest()
+            hash_name = hashlib.sha256(str(sorted(json_params)).replace(' ', '').encode('utf-8')).hexdigest()
             # save_name=f"{json_fp.split('/')[-1]}/{hash_name}/results"
             save_name=f"results/{script_name}/{hash_name}"
 
@@ -473,9 +510,10 @@ def run_variation_comparison(json_fps, variation_dict, show_prediction=False, sa
 
             if not load:
                 # NOTE first pass that saves weights to npz
-                print(f"Getting decoded points from training set{json_fp}")
+                print(f"Getting decoded points from training set: {json_fp}")
                 json_params['data']['dataset_range'] = json_params['data']['train_range']
                 rmse, eval_pts, target_pts, decoded_pts, weights, z_state = run(json_params)
+                np.savez_compressed('nef_weights.npz', weights=weights)
 
                 print('Getting test results')
                 json_params['data']['dataset_range'] = json_params['data']['test_range']
@@ -492,7 +530,8 @@ def run_variation_comparison(json_fps, variation_dict, show_prediction=False, sa
                     )
 
                 print('Calculating RMSE for each theta_p')
-                n_steps = np.diff(json_params['data']['dataset_range'])[0] - theta_steps
+                # n_steps = np.diff(json_params['data']['dataset_range'])[0] - theta_steps
+                n_steps = target_pts.shape[0] #- theta_steps
                 # RMSE between decoded GT and decoded network output
                 RMSEs = np.zeros((n_steps, int(len(theta_p))))#, m))
                 # RMSE beteween decoded GT and recorded state shifted in time
@@ -517,21 +556,15 @@ def run_variation_comparison(json_fps, variation_dict, show_prediction=False, sa
                         q=json_params['llp']['q'],
                         theta=json_params['llp']['theta'],
                     )
-                    print('X SHAPE: ', x.shape)
-                    print('Z_STATE SHAPE: ', z_state.shape)
-                    print('NEW Z SHAPE: ',
-                        z_state[tp_steps:-(t_steps-tp_steps), np.newaxis, :].T.shape)
 
                     err = RMSE(x.T, xhat.T)
                     RMSEs[:, ii] = err#[:, np.newaxis]
 
-                    print('\n\nTODO: sort out shape mismatch fr decoding tp/t < 1 since t is sliced from gt Z but not from zstate\n\n')
                     if t_steps == tp_steps:
                         err_gt = RMSE(z_state[tp_steps:, np.newaxis, :].T, x.T)
                     else:
                         err_gt = RMSE(z_state[tp_steps:-(t_steps-tp_steps), np.newaxis, :].T, x.T)
                     RMSEs_gt[:, ii] = err_gt
-                    # raise Exception
             else:
                 print(f"Loading results from: {save_name}")
                 json_params['data']['dataset_range'] = json_params['data']['test_range']
@@ -572,32 +605,33 @@ def run_variation_comparison(json_fps, variation_dict, show_prediction=False, sa
                     timestamp=False
                 )
 
-            save_fig = False
-            # print('jj: ', jj)
-            # print('vv: ', vv)
-            # if vv+1 == len(variation_list):
-            if vv+1 == len(variations):
-                if jj+1 == len(json_fps):
-                    save_fig = True
-                    print('saving image this time')
-            else:
+            if show_error:
                 save_fig = False
-            show = save_fig
-            # print('Plotting')
-            figure, axs = plotting.plot_mean_time_error_vs_theta_p(
-                theta_p=theta_p,
-                errors=RMSEs[:, :, np.newaxis],
-                errors_gt=RMSEs_gt[:, :, np.newaxis],
-                dt=json_params['general']['dt'],
-                theta=json_params['llp']['theta'],
-                figure=figure,
-                axs=axs,
-                show=show,
-                legend_label=name,#labels[vv],
-                save=save_fig,
-                folder='data',
-                label=f"{save_name.replace('.', '_').replace('/', '_')}_"
-            )
+                # print('jj: ', jj)
+                # print('vv: ', vv)
+                # if vv+1 == len(variation_list):
+                if vv+1 == len(variations):
+                    if jj+1 == len(json_fps):
+                        save_fig = True
+                        print('saving image this time')
+                else:
+                    save_fig = False
+                show = save_fig
+                # print('Plotting')
+                figure, axs = plotting.plot_mean_time_error_vs_theta_p(
+                    theta_p=theta_p,
+                    errors=RMSEs[:, :, np.newaxis],
+                    errors_gt=RMSEs_gt[:, :, np.newaxis],
+                    dt=json_params['general']['dt'],
+                    theta=json_params['llp']['theta'],
+                    figure=figure,
+                    axs=axs,
+                    show=show,
+                    legend_label=name,#labels[vv],
+                    save=save_fig,
+                    folder='data',
+                    label=f"{save_name.replace('.', '_').replace('/', '_')}_"
+                )
 
             if show_prediction:
                 plot_prediction_vs_gt(
@@ -605,173 +639,118 @@ def run_variation_comparison(json_fps, variation_dict, show_prediction=False, sa
                     decoded=decoded_pts,
                     q=json_params['llp']['q'],
                     theta=json_params['llp']['theta'],
-                    theta_p=theta_p,
+                    # theta_p=theta_p,
+                    theta_p=[json_params['llp']['theta']],
                     z_state=z_state,#[theta_steps:]
-                    xlim=[0, 1000],
+                    # xlim=[0, 1000],
                     show=True,
                     save=True,
                     savename=f"data/pred_vs_gt_q_{json_params['llp']['q']}.jpg"
                 )
 
-def run_json_comparison(json_list, labels, show_prediction=False):
-    figure = None
-    axs = None
-    for jj, json_fp in enumerate(json_list):
-        with open(json_fp) as fp:
-            json_params = json.load(fp)
+def get_script_RMSEs(script_name, db_name, db_folder=None, hash_ids=None):
+    dat = DataHandler(db_name, db_folder)
+    if hash_ids is None:
+        hash_ids = dat.load(f"results/{script_name}")#, recursive=False)
 
-        # NOTE first pass that saves weights to npz
-        print(f"Parameter set: {json_fp}")
-        print("Getting decoded points from training set")
-        json_params['data']['dataset_range'] = [0, 80000]
-        rmse, eval_pts, target_pts, decoded_pts, weights, z_state = run(json_params)
+    RMSEs = {}
+    for hh, hash_id in enumerate(hash_ids):
+        rmse = dat.load(
+            save_location=f"results/{script_name}/{hash_id}",
+            parameters=['RMSE']
+        )['RMSE']
+        RMSEs[hash_id] = np.mean(rmse)
 
-        print('Getting test results')
-        json_params['data']['dataset_range'] = [80000, 100000]
-        rmse, eval_pts, target_pts, decoded_pts, weights, z_state = run(json_params, weights=weights)
-
-        theta_steps = int(json_params['llp']['theta']/json_params['general']['dt'])
-
-        # Account for the steps removed from GT
-        n_steps = np.diff(json_params['data']['dataset_range'])[0] - theta_steps
-        m = len(json_params['data']['z_dims'])
-
-        # json_params['general']['theta_p'] = np.arange(
-        #         json_params['general']['dt'], json_params['llp']['theta'], json_params['general']['dt']*10
-        #     )
-        #
-        json_params['general']['theta_p'] = np.linspace(
-                json_params['general']['dt'], json_params['llp']['theta'], 10
-            )
-
-        print('Calculating RMSE for each theta_p')
-        RMSEs = np.zeros((n_steps, int(len(json_params['general']['theta_p']))))#, m))
-        for ii, tp in enumerate(json_params['general']['theta_p']):
-            tp_steps = int(tp/json_params['general']['dt'])
-            # decode GT coefficients
-            x = decode_ldn_data(
-                Z=target_pts,
-                q=json_params['llp']['q'],
-                theta=json_params['llp']['theta'],
-                theta_p=tp
-            )
-            # decode prediction
-            xhat = decode_ldn_data(
-                Z=decoded_pts,
-                q=json_params['llp']['q'],
-                theta=json_params['llp']['theta'],
-            )
-            err = RMSE(x.T, xhat.T)
-            RMSEs[:, ii] = err
-
-
-        if jj+1 == int(len(json_list)):
-            save = True
-        else:
-            save = False
-        show = save
-
-        # print('Plotting')
-        figure, axs = plotting.plot_mean_time_error_vs_theta_p(
-            theta_p=json_params['general']['theta_p'],
-            errors=RMSEs[:, :, np.newaxis],
-            dt=json_params['general']['dt'],
-            theta=json_params['llp']['theta'],
-            figure=figure,
-            axs=axs,
-            show=show,
-            legend_label=labels[jj],
-            save=save,
-            folder='data',
-            label='nef_decode_'
-        )
-
-        if show_prediction:
-            plot_prediction_vs_gt(
-                tgt=target_pts,
-                decoded=decoded_pts,
-                q=json_params['llp']['q'],
-                theta=json_params['llp']['theta'],
-                theta_p=json_params['general']['theta_p'],
-                z_state=z_state,#[theta_steps:]
-                xlim=[0, 1000],
-                show=True,
-                save=True,
-                savename=f"data/pred_vs_gt_q_{json_params['llp']['q']}.jpg"
-            )
+    import operator
+    sorted_d = sorted(RMSEs.items(), key=operator.itemgetter(1))
+    return sorted_d
 
 if __name__ == '__main__':
-    # NOTE DEPRECATED needs updating maaaybe
-    # labs = [
-    #         'neurons=1000, theta=1', 'neurons=1000, theta=0.1',
-    #         'neurons=10,000, theta=1', 'neurons=10,000, theta=0.1',
-    #         'n_neurons=1000, theta=1, 5x data', 'n_neurons=1000, theta=0.1, 5x data'
-    # ]
-    #
-    # json_list = [
-    #     'parameter_sets/params_0015a.json',
-    #     'parameter_sets/params_0015b.json',
-    #     'parameter_sets/params_0015c.json',
-    #     'parameter_sets/params_0015d.json',
-    #     'parameter_sets/params_0015e.json',
-    #     'parameter_sets/params_0015f.json',
-    # ]
-    # run_json_comparison(json_list, labs)
-    #
-
 
     # NOTE Current implementation for running experiment variations
     json_fps = [
         # 'parameter_sets/params_0016a.json',
         # 'parameter_sets/params_0016b.json',
         # 'parameter_sets/params_0018.json',
-        'parameter_sets/params_0019.json',
+        # 'parameter_sets/params_0019.json',
+        # 'parameter_sets/params_0021.json',
+        # 'parameter_sets/params_0022.json',
+        # 'parameter_sets/params_0023.json',
+        'parameter_sets/params_0024.json',
     ]
+    load = False
+    lookup = False
+    run_sim = False
+    if len(sys.argv) > 1:
+        if 'load' in sys.argv:
+            load = True
+        if 'lookup' in sys.argv:
+            lookup = True
+        if 'run' in sys.argv:
+            run_sim = True
+    if run_sim:
+        # for json_fp in json_fps:
+        run_variation_comparison(
+            json_fps=json_fps,
+            # variation_dict=None,
+            variation_dict = {
+                # 'llp/n_neurons': [1000, 5000, 10000],#, 50000],
+                # 'llp/theta': [1, 0.1],
+                # 'llp/q': [6],
+                # 'data/z_dims': [[0, 1, 2]],
+                # 'data/c_dims': [[0, 1, 2], [0, 1, 2, 8]],
+                # 'data/q_c': [4, 6],
+                # 'data/theta_c': [1, 3],
+                #
+                # 'data/q_u': [2, 4],
+                # 'data/theta_u': [1, 3],
+                #
+                # 'data/path_dims': [[0, 1, 2], [0, 1, 2, 8]],
+                # 'data/q_path': [4, 6],
+                # 'data/theta_path': [1, 3],
 
-    # for json_fp in json_fps:
-    # run_variation_comparison(
-    #     json_fps=json_fps,
-    #     # key_list=['llp', 'n_neurons'],
-    #     # variation_list=[1000, 2000, 5000],
-    #     variation_dict = {
-    #         # 'llp/n_neurons': [25000, 50000],
-    #         'llp/theta': [1, 0.1],
-    #         'llp/q': [2, 3],
-    #         # 'data/q_c': [1, 2, 3],
-    #         # 'data/theta_c': [1,2,3,4,5]
-    #         'data/q_u': [1, 2, 3],
-    #         'data/theta_u': [1, 2, 3, 4, 5]
-    #     },
-    #     # labels=['1000', '2000', '5000'],
-    #     show_prediction=False,
-    #     save=True,
-    # )
+            },
+            # labels=['1000', '2000', '5000'],
+            show_error=True,
+            show_prediction=False,
+            save=True,
+        )
 
     # NOTE Current implementation for loading results and plotting
-    script_name = 'nef_decode_llp_weight_TEST3'
+
     const_params = {
         # == Data ==
         # "data/db_name": "llp_pd_d",
         # "data/database_dir": "data/databases",
         # "data/dataset": "9999_linear_targets_faster",
-        # "data/state_key": "mean_shifted_normalized_ego_error",
-        # "data/ctrl_key": "clean_u",
         # "data/dataset_range": [0, 100000],
         # "data/train_range": [0, 80000],
         # "data/test_range": [80000, 100000],
-        # "data/c_dims": [0, 1, 2],
-        "data/q_c": 2,
+
+        # "data/state_key": "mean_shifted_normalized_ego_error",
+        # "data/state_key": "state",
+        "data/state_key": "mean_shift_abs_max_scale_state",
+        "data/z_dims": [0, 1, 2],
+        "data/c_dims": [0, 1, 2],
+        "data/q_c": 4,
         "data/theta_c": 1,
-        # "data/z_dims": [0, 1, 2],
+
+        "data/ctrl_key": "clean_u",
         # "data/u_dims": [],
-        "data/q_u": 0,
-        "data/theta_u": 0,
+        # "data/u_dims": [0, 1, 2, 3],
+        # "data/q_u": 0,
+        # "data/theta_u": 0,
+
+        "data/path_key": "target",
+        "data/path_dims": [0, 1, 2],
+        "data/q_path": 6,
+        "data/theta_path": 1
 
         # == llp ==
         # "llp/model_type": "mine",
-        "llp/n_neurons": 1000,
-        "llp/theta": 1,
-        "llp/q": 2,
+        # "llp/n_neurons": 1000,
+        # "llp/theta": 1,
+        # "llp/q": 6,
         # "llp/q_a": 5,
         # "llp/q_p": 2,
         # "llp/learning_rate": 8.656205265024589e-7,
@@ -787,23 +766,30 @@ if __name__ == '__main__':
         # "general/theta_p": [1]
     }
     # const_params = None
+    script_name = 'nef_decode_llp_weight_TEST3'
     db_name = 'llp_pd_d_results'
     db_folder = '/home/pjaworsk/src/masters/masters_thesis/masters_thesis/data/databases'
 
-    load_results(
-        script_name=script_name,
-        const_params=const_params,
-        db_name=db_name,
-        db_folder=db_folder,
-        ignore_keys=['general/theta_p', 'data/dataset_range'],
-        show_gt=False,
-        show_prediction=True
-    )
+    if load:
+        load_results(
+            script_name=script_name,
+            const_params=const_params,
+            db_name=db_name,
+            db_folder=db_folder,
+            ignore_keys=['general/theta_p', 'data/dataset_range'],
+            show_gt=False,
+            show_prediction=True
+        )
 
-    # lookup = gen_lookup_table(
-    #     db_name=db_name,
-    #     db_folder=db_folder,
-    # )
+    if lookup:
+        lookup = gen_lookup_table(
+            db_name=db_name,
+            db_folder=db_folder,
+        )
+        print_nested(lookup)
+        # from abr_analyze.utils import ascii_table
+        # ascii_table.print_lookup(data=lookup, invert=False)
+
     # param = 'llp/q'
     # val = 2
     # hashes = lookup[param][str(val)]

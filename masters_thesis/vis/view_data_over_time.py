@@ -7,6 +7,7 @@ if len(sys.argv) > 1:
         start = int(sys.argv[1])
         end = int(sys.argv[2])
     else:
+        start = 0
         end = int(sys.argv[1])
 else:
     start = 0
@@ -30,13 +31,13 @@ plotting.plot_2d(
     save_name=f'{folder}world_state_over_time.png'
 )
 
-# plotting.plot_2d(
-#     data['time'],
-#     data['mean_shift_abs_max_scale_state'],
-#     labels=['x', 'y', 'z', 'dx', 'dy', 'dz', 'a', 'b', 'g', 'da', 'db', 'dg'],
-#     title='World State: Mean Shifted and Normalized',
-#     save_name=f"{folder}world_state-shifted_norm_over_time.png"
-# )
+plotting.plot_2d(
+    data['time'][start:end],
+    data['mean_shift_abs_max_scale_state'][start:end],
+    labels=['x', 'y', 'z', 'dx', 'dy', 'dz', 'a', 'b', 'g', 'da', 'db', 'dg'],
+    title='World State: Mean Shifted and Normalized',
+    save_name=f"{folder}world_state-shifted_norm_over_time.png"
+)
 
 
 plotting.plot_2d(

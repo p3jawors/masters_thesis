@@ -44,9 +44,9 @@ def flip_odd_ldn_coefficients(Z, q):
     for ii, scale in enumerate(scales):
         if (ii%q)%2 != 0:
             scales[ii] *= -1
-    print('Z shape: ', Z.shape)
-    print('q: ', q)
-    print('scales: ', scales)
+    # print('Z shape: ', Z.shape)
+    # print('q: ', q)
+    # print('scales: ', scales)
     return scales*Z
 
 
@@ -87,17 +87,12 @@ def decode_ldn_data(Z, q, theta, theta_p=None):
 
 
 def RMSE(x, xhat):
-    print('---RMSE DEBUG---')
-    print('x: ', x.shape)
-    print('xhat: ', xhat.shape)
     err = 0
     for ii in range(0, x.shape[0]):
         for jj in range(0, x.shape[1]):
             err += (xhat[ii, jj] - x[ii, jj])**2
     err /= (ii+1)*(jj+1)
     err = np.sqrt(err)
-    print('err shape: ', err.shape)
-    print(err)
     return err
 
 
@@ -371,7 +366,13 @@ def load_data_from_json(json_params):
     dat = DataHandler(data_params['db_name'], data_params['database_dir'])
     data = dat.load(
         save_location=data_params['dataset'],
-        parameters=[data_params['state_key'], data_params['ctrl_key'], 'time']
+        parameters=
+            [
+                data_params['state_key'],
+                data_params['ctrl_key'],
+                data_params['path_key'],
+                'time'
+            ]
     )
 
     # extract our keys from the desired time range
@@ -384,17 +385,25 @@ def load_data_from_json(json_params):
     if full_ctrl.ndim == 1:
         full_ctrl = full_ctrl[:, np.newaxis]
 
+    full_path = data[data_params['path_key']][
+        data_params['dataset_range'][0]:data_params['dataset_range'][1]
+    ]
+
     times = data['time'][data_params['dataset_range'][0]:data_params['dataset_range'][1]]
 
     # extract our desired dimensions to use as context
     sub_state = np.take(full_state, indices=data_params['c_dims'], axis=1)
     sub_ctrl = np.take(full_ctrl, indices=data_params['u_dims'], axis=1)
-    print(sub_state.shape)
-    print(sub_ctrl.shape)
-    print('\n\n*TODO WILL NEED TO CHECK  DATASET_RANGE IN JSON WHEN LOADING\n\n')
+    sub_path = np.take(full_path, indices=data_params['path_dims'], axis=1)
+    print(f"State slice shape: {sub_state.shape} | c_dims: {data_params['c_dims']}")
+    print(f"Control slice shape: {sub_ctrl.shape} | u_dims: {data_params['u_dims']}")
+    print(f"Path slice shape: {sub_path.shape} | path_dims: {data_params['path_dims']}")
+
+
 
     # create ldn history of context that is set with a theta>0
     if len(data_params['u_dims']) > 0 and data_params['theta_u'] > 0:
+    # print('\n\n*TODO WILL NEED TO CHECK  DATASET_RANGE IN JSON WHEN LOADING\n\n')
         # loaded = False
         # sub_ctrl_key = (
         #     f"theta_{data_params['theta_u']}-"
@@ -469,8 +478,22 @@ def load_data_from_json(json_params):
             #     + f"{data_params['dataset']}/ldn_state/{sub_state_key}"
             # )
 
+    if len(data_params['path_dims']) > 0 and data_params['theta_path'] > 0:
+        sub_path = encode_ldn_data(
+            theta=data_params['theta_path'],
+            q=data_params['q_path'],
+            z=sub_path,
+            dt=params['dt']
+        )
+        # shift path to have context of planned future path theta sec into future
+        theta_steps = int(data_params['theta_path']/params['dt'])
+        sub_path = sub_path[theta_steps:, :]
+        # remove theta steps from end of remaining context so shape matches when stacking
+        sub_state = sub_state[:-theta_steps, :]
+        sub_ctrl = sub_ctrl[:-theta_steps, :]
+        full_state = full_state[:-theta_steps, :]
 
-    c_state = np.hstack((sub_state, sub_ctrl))
+    c_state = np.hstack((sub_state, sub_ctrl, sub_path))
     z_state = np.take(full_state, indices=data_params['z_dims'], axis=1)
 
     # clear some memory
@@ -483,8 +506,8 @@ def load_data_from_json(json_params):
 
     # add a few missing llp params that we can calculate
     # llp_params['size_c'] = len(data_params['c_dims']) + ctrl.shape[1]
-    llp_params['size_c'] = len(data_params['c_dims']) + len(data_params['u_dims'])
-    llp_params['size_z'] = len(data_params['z_dims'])
+    # llp_params['size_c'] = len(data_params['c_dims']) + len(data_params['u_dims']) + len(data_params['path_dims'])
+    # llp_params['size_z'] = len(data_params['z_dims'])
 
     loaded_json_params = {}
     loaded_json_params['data'] = data_params

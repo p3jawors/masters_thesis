@@ -26,20 +26,20 @@ if len(sys.argv) > 1:
     view = sys.argv[1]
 
 
-db_name = 'llp_pd'
-train_data = '100_linear_targets' #  90820 temporal data points
+db_name = 'llp_pd_d'
+train_data = '9999_linear_targets_faster' #  90820 temporal data points
 dat = DataHandler(db_name, database_dir='data/databases')
 data = dat.load(
     save_location=train_data,
     parameters=dat.get_keys(train_data)#['state', 'target']
 )
-MULTIPLIER = 1#30
+# MULTIPLIER = 1#30
 print('Available keys: ', dat.get_keys(train_data))
 print('State shape: ', data['state'].shape)
 print(' Target shape: ', data['target'].shape)
-state_err = MULTIPLIER * np.hstack((data['state'], np.subtract(data['target'], data['state'])))
-print('Stacked state-error shape: ', state_err.shape)
-# data['state_and_error_30x'] = state_err
+# state_err = MULTIPLIER * np.hstack((data['state'], np.subtract(data['target'], data['state'])))
+# print('Stacked state-error shape: ', state_err.shape)
+# # data['state_and_error_30x'] = state_err
 
 labs = [
     'x', 'y', 'z', 'dx', 'dy' , 'dz', 'a', 'b' , 'g', 'da', 'db', 'dg',

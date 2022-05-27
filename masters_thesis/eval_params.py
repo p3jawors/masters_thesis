@@ -5,8 +5,16 @@ import nengo
 import sys
 
 from abr_analyze import DataHandler
-from masters_thesis.utils.eval_utils import decode_ldn_data, calc_shifted_error, load_data_from_json, RMSE, encode_ldn_data
-from masters_thesis.utils.plotting import plot_pred, plot_error, plot_prediction_vs_gt
+from masters_thesis.utils.eval_utils import (
+        decode_ldn_data,
+        calc_shifted_error,
+        load_data_from_json,
+        RMSE,
+        encode_ldn_data,
+        decode_ldn_data,
+        flip_odd_ldn_coefficients
+)
+from masters_thesis.utils.plotting import plot_pred, plot_prediction_vs_gt
 import predict_llp
 
 # TODO update eval so we can have separate db for train data and results
@@ -47,33 +55,75 @@ def run(json_params, param_id, load_results=False, save=False, plot=True):
             **llp_params
         )
 
+    # calculate absolute error between theta_p shifted zdims state
+    # and decoded Z prediction at theta_p/theta
     zhat = decode_ldn_data(
         Z=results['Z'],
         q=llp_params['q'],
         theta=llp_params['theta'],
         theta_p=params['theta_p']
     )
+
+    errors = calc_shifted_error(
+        z=z_state,
+        zhat=zhat,
+        dt=params['dt'],
+        theta_p=params['theta_p']
+    )
+
+    # encode state with ldn using same parameters as
+    # the llp to see how well it is able to represent
+    # the actual future state
     GT_Z = encode_ldn_data(
         theta=llp_params['theta'],
         q=llp_params['q'],
         z=z_state,
         dt=params['dt']
     )
+    # flip coefficient signs to decode like llp (tp/t=1 is forward in time, not back)
+    GT_Z = flip_odd_ldn_coefficients(Z=GT_Z, q=llp_params['q'])
 
-    print("\n\nNOTE CURRENTLY ASSUMING ONE THETA_P AND THAT IT EQUALS THETA IN EVAL_PARAMS.py\n\n")
-    # Shift GT back by theta
     theta_steps = int(llp_params['theta']/params['dt'])
+    # remove first theta steps so at time t GT is from theta in future
     GT_Z = GT_Z[theta_steps:]
-    errors = RMSE(GT_Z, results['Z'][:-theta_steps])
 
-    # errors = calc_shifted_error(
-    #     z=z_state,
-    #     zhat=zhat,
-    #     dt=params['dt'],
-    #     theta_p=params['theta_p']
-    # )
+    # =============== REPEATED CODE IN DECODE GT WITH NEF =================
+    n_steps = GT_Z.shape[0] #- theta_steps
+    # RMSE between decoded GT and decoded network output
+    RMSEs = np.zeros((n_steps, int(len(params['theta_p']))))#, m))
+    # RMSE beteween decoded GT and recorded state shifted in time
+    RMSEs_gt = np.zeros(RMSEs.shape)
+    # max theta steps
+    t_steps = int(max(params['theta_p'])/json_params['general']['dt'])
+    for ii, tp in enumerate(params['theta_p']):
+        tp_steps = int(tp/json_params['general']['dt'])
+        x = decode_ldn_data(
+            Z=GT_Z,
+            q=json_params['llp']['q'],
+            theta=json_params['llp']['theta'],
+            theta_p=tp
+        )
+        xhat = decode_ldn_data(
+            Z=results['Z'],
+            q=json_params['llp']['q'],
+            theta=json_params['llp']['theta'],
+        )
 
-        # save params to the json name
+        # we cut the starting theta_steps out of GT_Z
+        # to align it in time, to make the shapes match
+        # up remove the ending theta steps from the prediction
+        # that ran a sim with the untruncated data.
+        err = RMSE(x.T, xhat[:-t_steps].T)
+        RMSEs[:, ii] = err#[:, np.newaxis]
+
+        if t_steps == tp_steps:
+            err_gt = RMSE(z_state[tp_steps:, np.newaxis, :].T, x.T)
+        else:
+            err_gt = RMSE(z_state[tp_steps:-(t_steps-tp_steps), np.newaxis, :].T, x.T)
+        RMSEs_gt[:, ii] = err_gt
+    # =====================================================================
+
+    # save params to the json name
     if save:
         dat.save(
             save_location=f"eval/{param_id}/results",
@@ -84,24 +134,26 @@ def run(json_params, param_id, load_results=False, save=False, plot=True):
 
     if plot:
         plot_prediction_vs_gt(
-            GT_Z,
-            results['Z'][:-theta_steps],
-            json_params['llp']['q'],
-            json_params['llp']['theta'],
-            json_params['general']['theta_p']
+            tgt=GT_Z,
+            decoded=results['Z'][:-theta_steps],
+            q=json_params['llp']['q'],
+            theta=json_params['llp']['theta'],
+            # theta_p=[0],#json_params['general']['theta_p'],
+            theta_p=json_params['general']['theta_p'],
+            z_state=z_state#[int(max(params['theta_p'])/params['dt']):, :]
         )
-    # if plot:
-    #     plot_error(theta_p=params['theta_p'], errors=errors, dt=params['dt'])
-    #
-    #     plot_pred(
-    #         time=times,
-    #         z=z_state,
-    #         zhat=zhat,
-    #         theta_p=params['theta_p'],
-    #         size_out=llp_params['size_z'],
-    #         gif_name=f'{folder}{param_id}.gif',
-    #         animate=False
-    #     )
+
+        # plot_error(theta_p=params['theta_p'], errors=errors, dt=params['dt'])
+
+        plot_pred(
+            time=times[:-theta_steps],
+            z=z_state,
+            zhat=zhat,#[:-theta_steps],
+            theta_p=params['theta_p'],
+            size_out=len(data_params['z_dims']),
+            gif_name=f'{folder}{param_id}.gif',
+            animate=False
+        )
 
     return errors, results, times, z_state, zhat
 

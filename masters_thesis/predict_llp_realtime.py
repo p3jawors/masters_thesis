@@ -11,7 +11,8 @@ Run the LLP Controller in airsim and visualize the predictions of future positio
 """
 import numpy as np
 import nengo
-from llp import LLP
+# from llp import LLP
+from network import LLP
 from ldn import LDN
 
 import math

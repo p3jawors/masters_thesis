@@ -19,12 +19,12 @@ plotting.plot_data_distribution(
     save_name=f"{folder}world_state-distribution.png"
 
 )
-# plotting.plot_data_distribution(
-#     data['mean_shift_abs_max_scale_state'],
-#     dim_labels=['x', 'y', 'z', 'dx', 'dy', 'dz', 'a', 'b', 'g', 'da', 'db', 'dg'],
-#     title='World State: Mean Shifted and Normalized',
-#     save_name=f"{folder}world_state-shifted_norm_distribution.png"
-# )
+plotting.plot_data_distribution(
+    data['mean_shift_abs_max_scale_state'],
+    dim_labels=['x', 'y', 'z', 'dx', 'dy', 'dz', 'a', 'b', 'g', 'da', 'db', 'dg'],
+    title='World State: Mean Shifted and Normalized',
+    save_name=f"{folder}world_state-shifted_norm_distribution.png"
+)
 
 plotting.plot_data_distribution(
     data['ego_error'],

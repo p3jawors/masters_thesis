@@ -16,12 +16,13 @@ def run_model(c_state, z_state, dt, record_activities=False, ens_args=None, **ll
 
     """
     # HACK FOR WEIGHTS
-    # print('USING HACKY WEIGHT LOADING')
-    # with np.load('weights_for_test.npz') as data:
-    #     llp_args['decoders'] = np.reshape(
-    #         data['weights'].T,
-    #         (llp_args['n_neurons'], llp_args['q'], z_state.shape[1])
-    #     )
+    print('\nUSING HACKY WEIGHT LOADING AND SETTING LEARING TO 0\n')
+    with np.load('nef_weights.npz') as data:
+        llp_args['decoders'] = np.reshape(
+            data['weights'].T,
+            (llp_args['n_neurons'], llp_args['q'], z_state.shape[1])
+        )
+        llp_args['learning_rate'] = 0
     if c_state.ndim == 1:
         c_state = c_state[:, np.newaxis]
     if z_state.ndim == 1:
@@ -31,6 +32,8 @@ def run_model(c_state, z_state, dt, record_activities=False, ens_args=None, **ll
     with model:
         n_pts = len(c_state)
 
+        llp_args['size_c'] = c_state.shape[1]
+        llp_args['size_z'] = z_state.shape[1]
         if llp_args['model_type'] == 'mine':
             # scaling factor to better align with other model
             # also used to account for different timesteps as
@@ -44,8 +47,8 @@ def run_model(c_state, z_state, dt, record_activities=False, ens_args=None, **ll
             )
         elif llp_args['model_type'] == 'other':
             llp = LearnDynSys(
-                size_c=llp_args['size_c'],
-                size_z=llp_args['size_z'],
+                size_c=c_state.shape[1],
+                size_z=z_state.shape[1], # len(llp_args['z_dims']),
                 q=llp_args['q'],
                 theta=llp_args['theta'],
                 n_neurons=llp_args['n_neurons'],

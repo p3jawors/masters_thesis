@@ -73,11 +73,11 @@ def plot_prediction_vs_gt(tgt, decoded, q, theta, theta_p, z_state=None, xlim=No
                 plt.title(f"theta={theta} | theta_p={theta_p[jj]}")
             if jj == 0:
                 plt.ylabel(f"dim_{ii}")
-            plt.plot(zhat_GT[:, jj, ii], label='gt z decoded')
+            plt.plot(zhat_GT[:, jj, ii], label='gt z decoded', c='g')
             # plt.gca().set_prop_cycle(None)
-            plt.plot(zhat_pred[:, jj, ii], linestyle='--', label='predicted z decoded')
+            plt.plot(zhat_pred[:, jj, ii], linestyle='--', c='r', label='predicted z decoded')
             if z_state is not None:
-                plt.plot(z_state[:, ii], linestyle='-', label='recorded z')
+                plt.plot(z_state[:, ii], linestyle='-', c='k', label='recorded z')
             plt.legend()
             if xlim is not None:
                 plt.xlim(xlim[0], xlim[1])
@@ -435,7 +435,7 @@ def plot_mean_time_error_vs_theta_p(
                 return str_dict
 
             axs[ii].text(
-                1.1, 0,
+                1.1, 0.5,
                 ('Constant Parameters\n'
                 +'___________________\n'
                 + dict_nested2str(all_constants)),

@@ -11,13 +11,18 @@ view = False
 if len(sys.argv) > 1:
     view = sys.argv[1]
 
-db_name = 'llp_pd_d'
-# database_dir = None
+db_name = 'llp_pd_e'
+database_dir = 'data/databases'
+train_data = '100_linear_targets_faster'
+
+# db_name = 'llp_pd'
 # database_dir = 'data/databases'
 # train_data = '1000_linear_targets_faster'
-database_dir = 'data/databases'
-train_data = '9999_linear_targets_faster'
-# train_data = '100_linear_targets' #  90820 temporal data points
+
+# db_name = 'llp_pd_d'
+# database_dir = 'data/databases'
+# train_data = '9999_linear_targets_faster'
+
 dat = DataHandler(db_name, database_dir=database_dir)
 data = dat.load(
     save_location=train_data,
@@ -26,15 +31,15 @@ data = dat.load(
 print('NUM POINTS: ', len(data['time']))
 
 data['gravity_rpm'] = 6800
-data['rpm_lim'] = 250
-data['clean_u'] = np.clip(
+data['rpm_lim'] = 3000
+data[f"clean_u_{data['rpm_lim']}"] = np.clip(
     (data['ctrl'] - data['gravity_rpm']),
     -data['rpm_lim'],
     data['rpm_lim']
     )/data['rpm_lim']
 
 # for key, val in data.items():
-keys = ['clean_u', 'ctrl']
+keys = [f"clean_u_{data['rpm_lim']}", 'ctrl']
 for key in keys:
     val = data[key]
     n_subs = min(val.shape)

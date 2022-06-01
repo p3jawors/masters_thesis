@@ -5,8 +5,9 @@ from abr_analyze import DataHandler
 from itertools import product
 import json
 import hashlib
-from masters_thesis.utils.eval_utils import encode_ldn_data, load_data_from_json, RMSE, flip_odd_ldn_coefficients, decode_ldn_data
+from masters_thesis.utils.eval_utils import encode_ldn_data, load_data_from_json, RMSE, flip_odd_ldn_coefficients, decode_ldn_data, calc_shifted_error
 from masters_thesis.utils.plotting import plot_x_vs_xhat, plot_prediction_vs_gt
+from masters_thesis.utils import plotting
 import masters_thesis.utils.plotting as plotting
 blue = "\033[94m"
 endc = "\033[0m"
@@ -47,6 +48,7 @@ def run(json_params, weights=None):
     data_params = loaded_json_params['data']
     llp_params = loaded_json_params['llp']
     params = loaded_json_params['general']
+    ens_params = loaded_json_params['ens_args']
 
     dat = DataHandler(data_params['db_name'], data_params['database_dir'])
 
@@ -80,7 +82,8 @@ def run(json_params, weights=None):
             n_neurons=llp_params['n_neurons'],
             dimensions=c_state.shape[1],
             neuron_type=llp_params['neuron_model'](),
-            radius=1,#np.sqrt(c_state.shape[1]),
+            # radius=1,#np.sqrt(c_state.shape[1]),
+            radius=ens_params['radius'],
             seed=0
         )
         pred = nengo.Node(size_in=GT_Z.shape[1])
@@ -279,18 +282,15 @@ def find_matches(dat, saved_exp_hashes, const_params):
             # print(type(data[param_key]))
         if num_diff == 0:
             matches.append(exp_hash)
-    print(f"{len(matches)} experiment hashes with matching parameters")
     return matches
 
 
-def load_results(
+def get_common_experiments(
         script_name,
         const_params,
         db_name,
         db_folder=None,
-        ignore_keys=None,
-        show_gt=False,
-        show_prediction=False):
+        ignore_keys=None):
 
     dat = DataHandler(
         db_name=db_name,
@@ -305,6 +305,9 @@ def load_results(
         # Get all experiment id's that match a set of key value pairs
         print(f"Searching for results with matching parameters to: {const_params}")
         saved_exp_hashes = find_matches(dat, saved_exp_hashes, const_params)
+        print(f"{len(saved_exp_hashes)} experiments found with matching parameters")
+        print(saved_exp_hashes)
+        show_prediction = len(saved_exp_hashes) == 1
 
     # Get a dictionary of common values and a list of keys for differing values
     # to use in the auto legend
@@ -323,6 +326,56 @@ def load_results(
         # to use in the auto legend
         # all_constants, legend_keys = compare_all_keys(dat, saved_exp_hashes, parameter_stems=['llp', 'data', 'general', 'ens_args'])
         const_params = all_constants.keys
+
+    return saved_exp_hashes, all_constants, legend_keys, const_params
+
+def load_results(
+        script_name,
+        const_params,
+        db_name,
+        db_folder=None,
+        ignore_keys=None,
+        show_gt=False,
+        show_prediction=False):
+
+    saved_exp_hashes, all_constants, legend_keys, const_params = get_common_experiments(
+            script_name, const_params, db_name, db_folder, ignore_keys)
+
+    dat = DataHandler(
+        db_name=db_name,
+        database_dir=db_folder
+    )
+    show_prediction = len(saved_exp_hashes) == 1
+    # # Load the hashes of all experiments that have been run for this script
+    # saved_exp_hashes = dat.get_keys(f"results/{script_name}")
+    # print(f"{len(saved_exp_hashes)} experiments found with results from {script_name}")
+    #
+    # # if isinstance(const_params, list) or isinstance(const_params, np.ndarray):
+    # if const_params is not None:
+    #     # Get all experiment id's that match a set of key value pairs
+    #     print(f"Searching for results with matching parameters to: {const_params}")
+    #     saved_exp_hashes = find_matches(dat, saved_exp_hashes, const_params)
+    #     print(f"{len(saved_exp_hashes)} experiments found with matching parameters")
+    #     print(saved_exp_hashes)
+    #     show_prediction = len(saved_exp_hashes) == 1
+    #
+    # # Get a dictionary of common values and a list of keys for differing values
+    # # to use in the auto legend
+    # all_constants, legend_keys = compare_all_keys(dat, saved_exp_hashes, parameter_stems=['llp', 'data', 'general', 'ens_args'])
+    # if ignore_keys is not None:
+    #     if isinstance(ignore_keys, str):
+    #         ignore_keys = [ignore_keys]
+    #
+    #     for key in ignore_keys:
+    #         if key in legend_keys:
+    #             legend_keys.remove(key)
+    #
+    # if const_params is None:
+    #     # Use all hashes saved to this experiment script
+    #     # Get a dictionary of common values and a list of keys for differing values
+    #     # to use in the auto legend
+    #     # all_constants, legend_keys = compare_all_keys(dat, saved_exp_hashes, parameter_stems=['llp', 'data', 'general', 'ens_args'])
+    #     const_params = all_constants.keys
 
     figure = None
     axs = None
@@ -392,7 +445,6 @@ def load_results(
         if mm+1 == len(saved_exp_hashes):
             save_fig = True
             constants_printout = all_constants
-            print('saving image this time')
         show = save_fig
 
         if show_prediction:
@@ -412,13 +464,28 @@ def load_results(
                 #         pred_data['llp/theta'],
                 #         10
                 # ),
-                theta_p=[1],
+                theta_p=[pred_data['llp/theta']],
+                # theta_p=[0, 0.8],
                 z_state=z_state,#[theta_steps:]
+                theta_steps=pred_data['llp/theta']/pred_data['general/dt'],
                 # xlim=[0, 1000],
                 show=False,
                 save=False,
+                label=name
                 # savename=f"data/pred_vs_gt_q_{json_params['llp']['q']}.jpg"
             )
+
+            plotting.plot_alpha_theta_p_error_subplot_dims(
+                theta=pred_data['llp/theta'],
+                theta_p = np.linspace(
+                        params['general/dt'],
+                        params['llp/theta'],
+                        10
+                    ),
+                errors=RMSEs[:, :, np.newaxis],
+                dt=params['general/dt'],
+            )
+
 
 
         # print('Plotting')
@@ -492,13 +559,14 @@ def run_variation_comparison(json_fps, variation_dict=None, show_error=False, sh
             else:
                 name = json_fp
             # nested_set(json_params, key_list, var)
-            hash_name = hashlib.sha256(str(sorted(json_params)).replace(' ', '').encode('utf-8')).hexdigest()
+            hash_name = hashlib.sha256(str(json_params).replace(' ', '').encode('utf-8')).hexdigest()
             # save_name=f"{json_fp.split('/')[-1]}/{hash_name}/results"
             save_name=f"results/{script_name}/{hash_name}"
 
 
             # print(f"Updated json_params by changing {key_list} to {var}\n{json_params}")
             print(f"hash_name: {hash_name}")
+            print(json_params)
 
             # account for steps removed from GT
             theta_steps = int(json_params['llp']['theta']/json_params['general']['dt'])
@@ -513,7 +581,7 @@ def run_variation_comparison(json_fps, variation_dict=None, show_error=False, sh
                 print(f"Getting decoded points from training set: {json_fp}")
                 json_params['data']['dataset_range'] = json_params['data']['train_range']
                 rmse, eval_pts, target_pts, decoded_pts, weights, z_state = run(json_params)
-                np.savez_compressed('nef_weights.npz', weights=weights)
+                # np.savez_compressed('nef_weights.npz', weights=weights)
 
                 print('Getting test results')
                 json_params['data']['dataset_range'] = json_params['data']['test_range']
@@ -565,6 +633,7 @@ def run_variation_comparison(json_fps, variation_dict=None, show_error=False, sh
                     else:
                         err_gt = RMSE(z_state[tp_steps:-(t_steps-tp_steps), np.newaxis, :].T, x.T)
                     RMSEs_gt[:, ii] = err_gt
+
             else:
                 print(f"Loading results from: {save_name}")
                 json_params['data']['dataset_range'] = json_params['data']['test_range']
@@ -642,11 +711,213 @@ def run_variation_comparison(json_fps, variation_dict=None, show_error=False, sh
                     # theta_p=theta_p,
                     theta_p=[json_params['llp']['theta']],
                     z_state=z_state,#[theta_steps:]
+                    theta_steps=theta_steps,
                     # xlim=[0, 1000],
                     show=True,
                     save=True,
                     savename=f"data/pred_vs_gt_q_{json_params['llp']['q']}.jpg"
                 )
+
+def compare_abs_error(
+        script_name,
+        const_params,
+        db_name,
+        db_folder=None,
+        ignore_keys=None,
+        show_gt=False,
+        show_prediction=False):
+
+    saved_exp_hashes, all_constants, legend_keys, const_params = get_common_experiments(
+            script_name, const_params, db_name, db_folder, ignore_keys)
+
+    dat = DataHandler(
+        db_name=db_name,
+        database_dir=db_folder
+    )
+    # if saved_exp_hashes is None:
+    #     print('Loading all experiments')
+    #     saved_exp_hashes = dat.get_keys(f"results/{script_name}")
+
+    fig = None
+    axs = None
+    for hh, hash_id in enumerate(saved_exp_hashes):
+        name_params = dat.load(
+            save_location=f'params/{hash_id}',
+            parameters=legend_keys
+        )
+        name = ""
+        for kk, key in enumerate(legend_keys):
+            if kk > 0 and kk < len(legend_keys):
+                name += " | "
+            # name += f"{key.split('/')[-1]}={name_params[key]}"
+            name += f"{key}={name_params[key]}"
+
+
+    # cal_abs_errors(
+    #     hash_id=hash_id,
+    #     script_name='nef_decode_llp_weight_TEST3',
+    #     decoded_pts=decoded_pts,
+    #     q=llp_params['q'],
+    #     theta=llp_params['theta'],
+    #     theta_p=theta_p,
+    #     z_state=z_state
+    # )
+        results = dat.load(
+            save_location=f"results/{script_name}/{hash_id}",
+            parameters=[
+                'target_pts',
+                'decoded_pts',
+                'z_state',
+            ]
+        )
+        params = dat.load(save_location=f"params/{hash_id}")
+        target_pts = results['target_pts']
+        decoded_pts = results['decoded_pts']
+        z_state = results['z_state']
+
+        theta_p = np.linspace(
+                params['general']['dt'], params['llp']['theta'], 10
+            )
+
+        zhat = decode_ldn_data(
+            Z=decoded_pts,
+            q=params['llp']['q'],
+            theta=params['llp']['theta'],
+            theta_p=theta_p
+        )
+
+        print('zstate: ', z_state.shape)
+        print('zhat: ', zhat.shape)
+        diff_errors = calc_shifted_error(
+            z=z_state[:-int(params['llp']['theta']/params['general']['dt'])],
+            zhat=zhat,
+            dt=params['general']['dt'],
+            theta_p=theta_p
+        )
+        abs_errors = abs(diff_errors)
+
+        # plot_prediction_vs_gt(
+        #     tgt=target_pts,
+        #     decoded=decoded_pts,
+        #     q=params['llp']['q'],
+        #     theta=params['llp']['theta'],
+        #     theta_p=[max(theta_p)],
+        #     z_state=z_state,#[theta_steps:]
+        #     theta_steps=int(params['llp']['theta']/params['general']['dt']),
+        #     # xlim=[0, 1000],
+        #     show=False,
+        #     save=False,
+        #     label=''
+        #     # savename=f"data/pred_vs_gt_q_{json_params['llp']['q']}.jpg"
+        # )
+        if len(saved_exp_hashes) == hh+1:
+            consts_to_show = all_constants
+        else:
+            consts_to_show = None
+        fig, axs = plotting.plot_mean_thetap_error_subplot_dims(
+            theta=params['llp']['theta'],
+            theta_p=theta_p,
+            errors=abs_errors,
+            dt=params['general']['dt'],
+            prediction_dim_labs=('X', 'Y', 'Z'),
+            save=False,
+            label=name,
+            folder='Figures',
+            fig=fig,
+            axs=axs,
+            show=len(saved_exp_hashes)==hh+1,
+            all_constants=consts_to_show
+        )
+
+
+
+
+# def calc_abs_errors(hash_id, script_name, decoded_pts, q, theta, theta_p, z_state)
+def calc_abs_errors(db_name, db_folder, script_name, saved_exp_hashes=None):
+    dat = DataHandler(
+        db_name=db_name,
+        database_dir=db_folder
+    )
+    if saved_exp_hashes is None:
+        print('Loading all experiments')
+        saved_exp_hashes = dat.get_keys(f"results/{script_name}")
+
+    fig = None
+    axs = None
+    for hh, hash_id in enumerate(saved_exp_hashes):
+    # cal_abs_errors(
+    #     hash_id=hash_id,
+    #     script_name='nef_decode_llp_weight_TEST3',
+    #     decoded_pts=decoded_pts,
+    #     q=llp_params['q'],
+    #     theta=llp_params['theta'],
+    #     theta_p=theta_p,
+    #     z_state=z_state
+    # )
+        results = dat.load(
+            save_location=f"results/{script_name}/{hash_id}",
+            parameters=[
+                'target_pts',
+                'decoded_pts',
+                'z_state',
+            ]
+        )
+        params = dat.load(save_location=f"params/{hash_id}")
+        target_pts = results['target_pts']
+        decoded_pts = results['decoded_pts']
+        z_state = results['z_state']
+
+        theta_p = np.linspace(
+                params['general']['dt'], params['llp']['theta'], 10
+            )
+
+        zhat = decode_ldn_data(
+            Z=decoded_pts,
+            q=params['llp']['q'],
+            theta=params['llp']['theta'],
+            theta_p=theta_p
+        )
+
+        print('zstate: ', z_state.shape)
+        print('zhat: ', zhat.shape)
+        abs_errors = calc_shifted_error(
+            z=z_state[:-int(params['llp']['theta']/params['general']['dt'])],
+            zhat=zhat,
+            dt=params['general']['dt'],
+            theta_p=theta_p
+        )
+
+        plot_prediction_vs_gt(
+            tgt=target_pts,
+            decoded=decoded_pts,
+            q=params['llp']['q'],
+            theta=params['llp']['theta'],
+            theta_p=[max(theta_p)],
+            z_state=z_state,#[theta_steps:]
+            theta_steps=int(params['llp']['theta']/params['general']['dt']),
+            # xlim=[0, 1000],
+            show=False,
+            save=False,
+            label=''
+            # savename=f"data/pred_vs_gt_q_{json_params['llp']['q']}.jpg"
+        )
+        fig, axs = plotting.plot_mean_thetap_error_subplot_dims(
+            theta=params['llp']['theta'],
+            theta_p=theta_p,
+            errors=abs_errors,
+            dt=params['general']['dt'],
+            prediction_dim_labs=('X', 'Y', 'Z'),
+            save=False,
+            label='',
+            folder='Figures',
+            fig=fig,
+            axs=axs,
+            show=len(saved_exp_hashes)==hh+1
+        )
+
+
+    # return abs_errors
+
 
 def get_script_RMSEs(script_name, db_name, db_folder=None, hash_ids=None):
     dat = DataHandler(db_name, db_folder)
@@ -676,7 +947,9 @@ if __name__ == '__main__':
         # 'parameter_sets/params_0021.json',
         # 'parameter_sets/params_0022.json',
         # 'parameter_sets/params_0023.json',
-        'parameter_sets/params_0024.json',
+        # 'parameter_sets/params_0024.json',
+        'parameter_sets/params_0024_nni_best.json',
+        # 'parameter_sets/params_0025.json',
     ]
     load = False
     lookup = False
@@ -694,6 +967,12 @@ if __name__ == '__main__':
             json_fps=json_fps,
             # variation_dict=None,
             variation_dict = {
+                # 'data/ctrl_key': [
+                #     'clean_u_500',
+                #     'clean_u_1000',
+                #     'clean_u_2000',
+                #     'clean_u_3000'
+                # ],
                 # 'llp/n_neurons': [1000, 5000, 10000],#, 50000],
                 # 'llp/theta': [1, 0.1],
                 # 'llp/q': [6],
@@ -705,14 +984,15 @@ if __name__ == '__main__':
                 # 'data/q_u': [2, 4],
                 # 'data/theta_u': [1, 3],
                 #
-                # 'data/path_dims': [[0, 1, 2], [0, 1, 2, 8]],
-                # 'data/q_path': [4, 6],
-                # 'data/theta_path': [1, 3],
+                # 'data/path_dims': [],#[0, 1, 2], [0, 1, 2, 8]],
+                # 'data/q_path': [0],#4, 6],
+                # 'data/theta_path': [0],#[1, 3],
+                # "ens_args/radius" : [0.5, 0.8, 1, 1.2, 2, 3]
 
             },
             # labels=['1000', '2000', '5000'],
             show_error=True,
-            show_prediction=False,
+            show_prediction=True,
             save=True,
         )
 
@@ -723,28 +1003,31 @@ if __name__ == '__main__':
         # "data/db_name": "llp_pd_d",
         # "data/database_dir": "data/databases",
         # "data/dataset": "9999_linear_targets_faster",
-        # "data/dataset_range": [0, 100000],
+        # "data/dataset_range": [0, 58609],
         # "data/train_range": [0, 80000],
         # "data/test_range": [80000, 100000],
+        # "data/test_range": [300000, 320000],
 
         # "data/state_key": "mean_shifted_normalized_ego_error",
         # "data/state_key": "state",
-        "data/state_key": "mean_shift_abs_max_scale_state",
-        "data/z_dims": [0, 1, 2],
-        "data/c_dims": [0, 1, 2],
-        "data/q_c": 4,
-        "data/theta_c": 1,
+        # "data/state_key": "mean_shift_abs_max_scale_state",
+        # "data/z_dims": [2],
+        # "data/c_dims": [0, 1, 2],
+        # "data/q_c": 6,
+        # "data/theta_c": 1.88,
 
-        "data/ctrl_key": "clean_u",
+        # "data/ctrl_key": "clean_u_2000",
         # "data/u_dims": [],
         # "data/u_dims": [0, 1, 2, 3],
         # "data/q_u": 0,
-        # "data/theta_u": 0,
+        # "data/theta_u": 8.11,
 
-        "data/path_key": "target",
-        "data/path_dims": [0, 1, 2],
-        "data/q_path": 6,
-        "data/theta_path": 1
+        # "data/path_key": "target",
+        "data/path_key": "mean_shift_abs_max_scale_target",
+        # "data/path_dims": [0, 1, 2],
+        # "data/path_dims": [0, 1, 2],
+        # "data/q_path": 6,
+        # "data/theta_path": 0
 
         # == llp ==
         # "llp/model_type": "mine",
@@ -768,7 +1051,31 @@ if __name__ == '__main__':
     # const_params = None
     script_name = 'nef_decode_llp_weight_TEST3'
     db_name = 'llp_pd_d_results'
+    # db_name = 'llp_pd_e_results'
     db_folder = '/home/pjaworsk/src/masters/masters_thesis/masters_thesis/data/databases'
+
+    if 'abs' in sys.argv:
+        compare_abs_error(
+            script_name=script_name,
+            const_params=const_params,
+            db_name=db_name,
+            db_folder=db_folder,
+            # ignore_keys=['general/theta_p', 'data/dataset_range'],
+            show_gt=True,
+            show_prediction=True
+        )
+    # if 'abs' in sys.argv:
+    #     calc_abs_errors(
+    #         db_name,
+    #         db_folder,
+    #         script_name,
+    #         saved_exp_hashes=[
+    #         #     '84f2ff860a24cfbe0e2cfc76ee0888c3468a6d72dcc04f0f656cdc2ce8467510'
+    #         # ]
+    #             '84f2ff860a24cfbe0e2cfc76ee0888c3468a6d72dcc04f0f656cdc2ce8467510',
+    #             'bf652574b3ebf25de778491cf26c0368f650c28c130cac6df67652626e1c857c'
+    #         ]
+    #     )
 
     if load:
         load_results(
@@ -776,8 +1083,8 @@ if __name__ == '__main__':
             const_params=const_params,
             db_name=db_name,
             db_folder=db_folder,
-            ignore_keys=['general/theta_p', 'data/dataset_range'],
-            show_gt=False,
+            # ignore_keys=['general/theta_p', 'data/dataset_range'],
+            show_gt=True,
             show_prediction=True
         )
 
@@ -801,4 +1108,3 @@ if __name__ == '__main__':
     #         save_location=f"params/{hash_id}",
     #         parameters=[param]
     #         )[param]
-    #     )

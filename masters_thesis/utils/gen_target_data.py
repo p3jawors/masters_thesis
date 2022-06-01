@@ -25,13 +25,13 @@ view = False
 if len(sys.argv) > 1:
     view = sys.argv[1]
 
-db_name = 'llp_pd_e'
-database_dir = 'data/databases'
-train_data = '100_linear_targets_faster'
-
-# db_name = 'llp_pd_d'
+# db_name = 'llp_pd_e'
 # database_dir = 'data/databases'
-# train_data = '9999_linear_targets_faster' #  90820 temporal data points
+# train_data = '100_linear_targets_faster'
+
+db_name = 'llp_pd_d'
+database_dir = 'data/databases'
+train_data = '9999_linear_targets_faster' #  90820 temporal data points
 dat = DataHandler(
     db_name=db_name,
     database_dir=database_dir
@@ -52,12 +52,12 @@ labs = [
     'x', 'y', 'z', 'dx', 'dy' , 'dz', 'a', 'b' , 'g', 'da', 'db', 'dg',
     'ex', 'ey', 'ez', 'edx', 'edy', 'edz', 'ea', 'eb' , 'eg', 'eda', 'edb', 'edg'
 ]
-new_state = np.empty(data['state'].shape)
-for ii in range(0, data['state'].shape[1]):
-    dim = data['state'][:, ii]
+new_state = np.empty(data['target'].shape)
+for ii in range(0, data['target'].shape[1]):
+    dim = data['target'][:, ii]
     new_state[:, ii] = (dim - np.mean(dim))/np.amax(abs(dim-np.mean(dim)))
 
-data['mean_shift_abs_max_scale_state'] = new_state
+data['mean_shift_abs_max_scale_target'] = new_state
 if view:
     plot_thing(new_state)
 

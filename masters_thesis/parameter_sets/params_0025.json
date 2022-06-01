@@ -1,33 +1,33 @@
 {
    "data": {
-        "db_name": "llp_pd_d",
+        "db_name": "llp_pd_e",
         "database_dir": "data/databases",
-        "dataset": "9999_linear_targets_faster",
-        "dataset_range": [0, 100000],
-        "train_range": [0, 80000],
-        "test_range": [80000, 100000],
+        "dataset": "100_linear_targets_faster",
+        "dataset_range": [0, 58609],
+        "train_range": [0, 40000],
+        "test_range": [40000, 58000],
 
         "state_key": "mean_shift_abs_max_scale_state",
-        "z_dims": [0, 1, 2],
-        "c_dims": [0, 1, 2],
+        "z_dims": [2],
+        "c_dims": [0, 1, 2, 3, 4, 5],
         "q_c": 6,
-        "theta_c": 0.41,
+        "theta_c": 1.88,
 
-        "ctrl_key": "clean_u",
+        "ctrl_key": "clean_u_2000",
         "u_dims": [0, 1, 2, 3],
         "q_u": 7,
-        "theta_u": 8.11,
+        "theta_u": 3.2,
 
         "path_key": "target",
-        "path_dims": [0, 1, 2],
-        "q_path": 6,
-        "theta_path": 1
+        "path_dims": [0, 1, 2, 3, 4, 5],
+        "q_path": 5,
+        "theta_path": 1.45
     },
    "llp": {
         "model_type": "mine",
-        "n_neurons": 1000,
+        "n_neurons": 3000,
         "theta": 1,
-        "q": 6,
+        "q": 5,
         "q_a": 5,
         "q_p": 2,
         "learning_rate": 8.656205265024589e-7,
@@ -35,7 +35,7 @@
     },
     "ens_args": {
         "seed": 0,
-        "radius": 1
+        "radius": 1.0
     },
     "general": {
         "run_nni": false,

@@ -36,7 +36,7 @@ def plot_x_vs_xhat(x, xhat):
     plt.tight_layout()
     plt.show()
 
-def plot_prediction_vs_gt(tgt, decoded, q, theta, theta_p, z_state=None, xlim=None, save=False, savename='pred_vs_gt.jpg', show=True):
+def plot_prediction_vs_gt(tgt, decoded, q, theta, theta_p, theta_steps=None, z_state=None, xlim=None, save=False, savename='pred_vs_gt.jpg', show=True, label=''):
     """
     Plots predictions of legendre coefficients against GT,
     and their decoded values given theta and theta_p
@@ -46,10 +46,13 @@ def plot_prediction_vs_gt(tgt, decoded, q, theta, theta_p, z_state=None, xlim=No
     """
     plt.figure(figsize=(12,12))
     for ii in range(0, tgt.shape[1]):
+        if ii == 0:
+            plt.title(f"Prediction vs GT in Legendre: {label}")
         plt.subplot(tgt.shape[1], 1, ii+1)
-        plt.plot(tgt[:, ii])
+        plt.plot(tgt[:, ii], label='target')
         # plt.gca().set_prop_cycle(None)
-        plt.plot(decoded[:, ii], linestyle='--')
+        plt.plot(decoded[:, ii], linestyle='--', label='decoded')
+    plt.tight_layout()
 
     plt.figure(figsize=(20,12))
     zhat_GT = decode_ldn_data(
@@ -64,23 +67,25 @@ def plot_prediction_vs_gt(tgt, decoded, q, theta, theta_p, z_state=None, xlim=No
         theta=theta,
         theta_p=theta_p
     )
-    print(zhat_pred.shape)
 
     for ii in range(0, zhat_GT.shape[2]):
         for jj in range(0, zhat_GT.shape[1]):
             plt.subplot(zhat_GT.shape[2], zhat_GT.shape[1], ii*(zhat_GT.shape[1]) + jj+1)
             if ii == 0:
-                plt.title(f"theta={theta} | theta_p={theta_p[jj]}")
+                plt.title(f"Prediction vs GT Decoded\ntheta={theta} | theta_p={theta_p[jj]}\n{label}")
             if jj == 0:
                 plt.ylabel(f"dim_{ii}")
-            plt.plot(zhat_GT[:, jj, ii], label='gt z decoded', c='g')
+            plt.plot(zhat_GT[:, jj, ii], label='gt Z decoded', c='c')
             # plt.gca().set_prop_cycle(None)
-            plt.plot(zhat_pred[:, jj, ii], linestyle='--', c='r', label='predicted z decoded')
+            plt.plot(zhat_pred[:, jj, ii], linestyle='--', c='r', label='predicted Z decoded')
             if z_state is not None:
-                plt.plot(z_state[:, ii], linestyle='-', c='k', label='recorded z')
+                plt.plot(z_state[:, ii], linestyle='-', c='k', label='z actual')
+                if theta_steps is not None:
+                    plt.plot(z_state[int(theta_steps):, ii], linestyle='--', c='k', label='z actual shifted theta_p')
             plt.legend()
             if xlim is not None:
                 plt.xlim(xlim[0], xlim[1])
+            plt.grid(True)
 
     if save:
         plt.savefig(savename)
@@ -278,7 +283,9 @@ def plot_error_heatmap_subplot_dims(theta, theta_p, errors, dt, prediction_dim_l
         plt.savefig(f'{folder}/{label}2d_error_heat_map.jpg')
     plt.show()
 
-def plot_mean_thetap_error_subplot_dims(theta, theta_p, errors, dt, prediction_dim_labs=('X', 'Y', 'Z'), save=False, label='', folder='Figures'):
+def plot_mean_thetap_error_subplot_dims(
+        theta, theta_p, errors, dt, prediction_dim_labs=('X', 'Y', 'Z'), save=False, label='', folder='Figures',
+        fig=None, axs=None, show=None, all_constants=None):
     """
     Parameters
     ----------
@@ -296,28 +303,86 @@ def plot_mean_thetap_error_subplot_dims(theta, theta_p, errors, dt, prediction_d
     time = np.linspace(0, errors.shape[0]*dt, errors.shape[0])
 
     # Plot avg error over time, averaging over theta_p
-    plt.figure(figsize=(8,12))
-    axs = []
+    if fig is None:
+        fig = plt.figure(figsize=(8,12))
+        fig.minimum_y = 0
+    if axs is None:
+        axs = []
+        gen_axs = True
+    else:
+        gen_axs = False
     for ii in range(0, errors.shape[2]+1):
-        axs.append(plt.subplot(errors.shape[2]+1, 1, ii+1))
+        if gen_axs:
+            axs.append(plt.subplot(errors.shape[2]+1, 1, ii+1))
         if ii < errors.shape[2]:
             plt.title("Error over Time")
             plt.xlabel('Time [sec]')
             plt.ylabel(f'{prediction_dim_labs[ii]} Mean Error Over Theta_P')
-            axs[ii].plot(time, np.mean(errors[:, :, ii], axis=1))
+            y = np.mean(errors[:, :, ii], axis=1)
+            # axs[ii].axhline(np.mean(np.mean(errors[:, :, ii], axis=1)), linestyle='--', c='k')
+            if ii == 0:
+                axs[ii].plot(time, y, label=label)
+            else:
+                axs[ii].plot(time, y)
+
+            if ii == 2:
+                fig.minimum_y = min(fig.minimum_y, np.amin(y))
         else:
             plt.title("Error over Time")
             plt.xlabel('Time [sec]')
             plt.ylabel(f'2norm Error of Mean Over Theta_P')
             axs[ii].plot(time, np.linalg.norm(np.mean(errors, axis=1), axis=1))
 
+        axs[ii].legend(loc='center left', bbox_to_anchor=(1, 0.75), fontsize=8)
+        if all_constants is not None and ii==2:#errors.shape[2]:
+            # def print_nested(d, indent=0):
+            #     for key, value in d.items():
+            #         if isinstance(value, dict):
+            #             print('\t' * indent + str(key) + ': ')
+            #             print_nested(value, indent+1)
+            #         else:
+            #             print('\t' * indent + str(key) + f': {value}')
+            #
+            # print_nested(all_constants)
+
+            def dict_nested2str(d, indent=4, _recursive_call=False):
+                str_dict = ''
+                if _recursive_call:
+                    internal_indent = indent
+                else:
+                    internal_indent = 0
+                # print('internal: ', internal_indent)
+                for key, value in d.items():
+                    if isinstance(value, dict):
+                        str_dict += '\n' + ' ' * internal_indent + str(key) + ': '
+                        # str_dict += str(key) + ": "
+                        # str_dict += '-woah-' + str(value)
+                        str_dict += dict_nested2str(value, indent*2, _recursive_call=True)
+                    else:
+                        str_dict += '\n' + ' ' * internal_indent + str(key) + f': {value}'
+                return str_dict
+
+            axs[ii].text(
+                max(time)+20, fig.minimum_y*2,
+                ('Constant Parameters\n'
+                +'___________________\n'
+                + dict_nested2str(all_constants)),
+                fontsize=8
+            )
+            plt.subplots_adjust(right=0.6)
+
+    # plt.tight_layout()
     if save:
         plt.savefig(f'{folder}/{label}error_over_time_avg_tp.jpg')
-    plt.show()
+    if show:
+        plt.show()
+
+    return fig, axs
 
 
 
-def plot_alpha_theta_p_error_subplot_dims(theta, theta_p, errors, dt, prediction_dim_labs=('X', 'Y', 'Z'), save=False, label='', folder='Figures'):
+def plot_alpha_theta_p_error_subplot_dims(
+        theta, theta_p, errors, dt, prediction_dim_labs=('X', 'Y', 'Z'), save=False, label='', folder='Figures'):
     """
     Parameters
     ----------
@@ -435,13 +500,12 @@ def plot_mean_time_error_vs_theta_p(
                 return str_dict
 
             axs[ii].text(
-                1.1, 0.5,
+                1.1, 0.1,
                 ('Constant Parameters\n'
                 +'___________________\n'
                 + dict_nested2str(all_constants)),
                 fontsize=8
             )
-            plt.grid(True)
             plt.subplots_adjust(right=0.6)
 
     if save:
@@ -450,6 +514,8 @@ def plot_mean_time_error_vs_theta_p(
         print(f'Save figure to {folder}/{label}error_over_tp.jpg')
 
     if show:
+        # for ax in axs:
+        #     plt.grid(True)
         plt.tight_layout()
         print('showing fig')
         plt.show()

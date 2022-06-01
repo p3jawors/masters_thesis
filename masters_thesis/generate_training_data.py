@@ -198,7 +198,7 @@ for ii in range(0, n_targets):
     target = [
             np.random.uniform(low=-15, high=15, size=1)[0],
             np.random.uniform(low=-15, high=15, size=1)[0],
-            np.random.uniform(low=-15, high=-1, size=1)[0],
+            np.random.uniform(low=-31, high=-1, size=1)[0],
             0, 0, 0,
             0, 0, np.random.uniform(low=-np.pi, high=np.pi, size=1)[0],
             0, 0, 0]
@@ -222,9 +222,10 @@ try:
         path_node = PathPlannerNode(
                 path_planner=path,
                 targets=targets,
+                start_state=np.zeros(12),
                 dt=airsim_dt,
                 buffer_reach_time=0,
-                use_start_location=True,
+                # use_start_location=True,
                 max_velocity=6,
                 start_velocity=0,
                 target_velocity=0
@@ -272,7 +273,7 @@ except ExitSim as e:
     print('Exiting Sim')
 
 finally:
-    dat = DataHandler('llp_pd_d', 'data/databases')
+    dat = DataHandler('llp_pd_e', 'data/databases')
     data = {}
     for key, val in probes.items():
         data[key] = sim.data[val]

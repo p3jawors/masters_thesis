@@ -36,7 +36,7 @@ def plot_x_vs_xhat(x, xhat):
     plt.tight_layout()
     plt.show()
 
-def plot_prediction_vs_gt(tgt, decoded, q, theta, theta_p, theta_steps=None, z_state=None, xlim=None, save=False, savename='pred_vs_gt.jpg', show=True, label=''):
+def plot_prediction_vs_gt(tgt, decoded, q, theta, theta_p, prediction_dim_labs=None, theta_steps=None, z_state=None, xlim=None, save=False, savename='pred_vs_gt.jpg', show=True, label=''):
     """
     Plots predictions of legendre coefficients against GT,
     and their decoded values given theta and theta_p
@@ -74,7 +74,10 @@ def plot_prediction_vs_gt(tgt, decoded, q, theta, theta_p, theta_steps=None, z_s
             if ii == 0:
                 plt.title(f"Prediction vs GT Decoded\ntheta={theta} | theta_p={theta_p[jj]}\n{label}")
             if jj == 0:
-                plt.ylabel(f"dim_{ii}")
+                if prediction_dim_labs == None:
+                    plt.ylabel(f"dim_{ii}")
+                else:
+                    plt.ylabel(f"{prediction_dim_labs[ii]}")
             plt.plot(zhat_GT[:, jj, ii], label='gt Z decoded', c='c')
             # plt.gca().set_prop_cycle(None)
             plt.plot(zhat_pred[:, jj, ii], linestyle='--', c='r', label='predicted Z decoded')
@@ -82,7 +85,7 @@ def plot_prediction_vs_gt(tgt, decoded, q, theta, theta_p, theta_steps=None, z_s
                 plt.plot(z_state[:, ii], linestyle='-', c='k', label='z actual')
                 if theta_steps is not None:
                     plt.plot(z_state[int(theta_steps):, ii], linestyle='--', c='k', label='z actual shifted theta_p')
-            plt.legend()
+            plt.legend(loc=1)
             if xlim is not None:
                 plt.xlim(xlim[0], xlim[1])
             plt.grid(True)
@@ -426,7 +429,7 @@ def plot_alpha_theta_p_error_subplot_dims(
 
 
 def plot_mean_time_error_vs_theta_p(
-        theta, theta_p, errors, dt, prediction_dim_labs=('X', 'Y', 'Z'), save=False, label='', folder='Figures',
+        theta, theta_p, errors, dt, prediction_dim_labs, save=False, label='', folder='Figures',
         figure=None, axs=None, show=False, legend_label=None, linestyle='-', title=None, all_constants=None,
         errors_gt=None):
     """
@@ -457,6 +460,7 @@ def plot_mean_time_error_vs_theta_p(
     if title is None:
         "Error over Theta_P"
     for ii in range(0, errors.shape[2]):
+        print('PRED DIM LABS: ', prediction_dim_labs)
         if gen_axs:
             axs.append(plt.subplot(errors.shape[2], 1, ii+1))
         axs[ii].set_title(title)
@@ -500,7 +504,7 @@ def plot_mean_time_error_vs_theta_p(
                 return str_dict
 
             axs[ii].text(
-                1.1, 0.1,
+                1.1, 0.03,
                 ('Constant Parameters\n'
                 +'___________________\n'
                 + dict_nested2str(all_constants)),

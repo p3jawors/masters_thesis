@@ -11,17 +11,17 @@ view = False
 if len(sys.argv) > 1:
     view = sys.argv[1]
 
-db_name = 'llp_pd_e'
-database_dir = 'data/databases'
-train_data = '100_linear_targets_faster'
+# db_name = 'llp_pd_e'
+# database_dir = 'data/databases'
+# train_data = '100_linear_targets_faster'
 
 # db_name = 'llp_pd'
 # database_dir = 'data/databases'
 # train_data = '1000_linear_targets_faster'
 
-# db_name = 'llp_pd_d'
-# database_dir = 'data/databases'
-# train_data = '9999_linear_targets_faster'
+db_name = 'llp_pd_d'
+database_dir = 'data/databases'
+train_data = '9999_linear_targets_faster'
 
 dat = DataHandler(db_name, database_dir=database_dir)
 data = dat.load(
@@ -31,7 +31,7 @@ data = dat.load(
 print('NUM POINTS: ', len(data['time']))
 
 data['gravity_rpm'] = 6800
-data['rpm_lim'] = 3000
+data['rpm_lim'] = 2000
 data[f"clean_u_{data['rpm_lim']}"] = np.clip(
     (data['ctrl'] - data['gravity_rpm']),
     -data['rpm_lim'],

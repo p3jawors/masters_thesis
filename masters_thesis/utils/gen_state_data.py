@@ -56,6 +56,11 @@ new_state = np.empty(data['state'].shape)
 for ii in range(0, data['state'].shape[1]):
     dim = data['state'][:, ii]
     new_state[:, ii] = (dim - np.mean(dim))/np.amax(abs(dim-np.mean(dim)))
+    print('---------')
+    print('DIM: ', ii)
+    print('MEAN: ', np.mean(dim))
+    print('SCALE: ', np.amax(abs(dim-np.mean(dim))))
+    new_state[:, ii] = (dim - np.mean(dim))/np.amax(abs(dim-np.mean(dim)))
 
 data['mean_shift_abs_max_scale_state'] = new_state
 if view:

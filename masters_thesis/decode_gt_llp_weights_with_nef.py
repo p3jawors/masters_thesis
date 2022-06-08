@@ -301,6 +301,10 @@ def get_common_experiments(
     print(f"{len(saved_exp_hashes)} experiments found with results from {script_name}")
 
     # if isinstance(const_params, list) or isinstance(const_params, np.ndarray):
+    # if isinstance(const_params, str):
+    #     with open(const_params) as fp:
+    #         const_params = json.load(fp)
+
     if const_params is not None:
         # Get all experiment id's that match a set of key value pairs
         print(f"Searching for results with matching parameters to: {const_params}")
@@ -465,9 +469,10 @@ def load_results(
                 #         10
                 # ),
                 theta_p=[pred_data['llp/theta']],
-                # theta_p=[0, 0.8],
+                # theta_p=[0, 1.0],
+                prediction_dim_labs=['X', 'Y', 'Z'],
                 z_state=z_state,#[theta_steps:]
-                theta_steps=pred_data['llp/theta']/pred_data['general/dt'],
+                # theta_steps=pred_data['llp/theta']/pred_data['general/dt'],
                 # xlim=[0, 1000],
                 show=False,
                 save=False,
@@ -475,16 +480,16 @@ def load_results(
                 # savename=f"data/pred_vs_gt_q_{json_params['llp']['q']}.jpg"
             )
 
-            plotting.plot_alpha_theta_p_error_subplot_dims(
-                theta=pred_data['llp/theta'],
-                theta_p = np.linspace(
-                        params['general/dt'],
-                        params['llp/theta'],
-                        10
-                    ),
-                errors=RMSEs[:, :, np.newaxis],
-                dt=params['general/dt'],
-            )
+            # plotting.plot_alpha_theta_p_error_subplot_dims(
+            #     theta=pred_data['llp/theta'],
+            #     theta_p = np.linspace(
+            #             params['general/dt'],
+            #             params['llp/theta'],
+            #             10
+            #         ),
+            #     errors=RMSEs[:, :, np.newaxis],
+            #     dt=params['general/dt'],
+            # )
 
 
 
@@ -510,6 +515,7 @@ def load_results(
             save=save_fig,
             folder='data',
             label="",#f"{save_name.replace('.', '_').replace('/', '_')}_"
+            prediction_dim_labs=['XYZ'],
             all_constants=constants_printout,
             errors_gt=RMSE_gt,
         )
@@ -581,7 +587,7 @@ def run_variation_comparison(json_fps, variation_dict=None, show_error=False, sh
                 print(f"Getting decoded points from training set: {json_fp}")
                 json_params['data']['dataset_range'] = json_params['data']['train_range']
                 rmse, eval_pts, target_pts, decoded_pts, weights, z_state = run(json_params)
-                # np.savez_compressed('nef_weights.npz', weights=weights)
+                np.savez_compressed('nef_weights.npz', weights=weights)
 
                 print('Getting test results')
                 json_params['data']['dataset_range'] = json_params['data']['test_range']
@@ -687,6 +693,7 @@ def run_variation_comparison(json_fps, variation_dict=None, show_error=False, sh
                     save_fig = False
                 show = save_fig
                 # print('Plotting')
+
                 figure, axs = plotting.plot_mean_time_error_vs_theta_p(
                     theta_p=theta_p,
                     errors=RMSEs[:, :, np.newaxis],
@@ -697,6 +704,7 @@ def run_variation_comparison(json_fps, variation_dict=None, show_error=False, sh
                     axs=axs,
                     show=show,
                     legend_label=name,#labels[vv],
+                    prediction_dim_labs=['XYZ'],
                     save=save_fig,
                     folder='data',
                     label=f"{save_name.replace('.', '_').replace('/', '_')}_"
@@ -795,6 +803,7 @@ def compare_abs_error(
             theta_p=theta_p
         )
         abs_errors = abs(diff_errors)
+        print('ABS ERRORS: ', abs_errors.shape)
 
         # plot_prediction_vs_gt(
         #     tgt=target_pts,
@@ -820,6 +829,7 @@ def compare_abs_error(
             errors=abs_errors,
             dt=params['general']['dt'],
             prediction_dim_labs=('X', 'Y', 'Z'),
+            # prediction_dim_labs=('XYZ'),
             save=False,
             label=name,
             folder='Figures',
@@ -948,8 +958,9 @@ if __name__ == '__main__':
         # 'parameter_sets/params_0022.json',
         # 'parameter_sets/params_0023.json',
         # 'parameter_sets/params_0024.json',
-        'parameter_sets/params_0024_nni_best.json',
+        # 'parameter_sets/params_0024_nni_best.json',
         # 'parameter_sets/params_0025.json',
+        'parameter_sets/params_0025_nni_best.json',
     ]
     load = False
     lookup = False
@@ -973,7 +984,7 @@ if __name__ == '__main__':
                 #     'clean_u_2000',
                 #     'clean_u_3000'
                 # ],
-                # 'llp/n_neurons': [1000, 5000, 10000],#, 50000],
+                # 'llp/n_neurons': [500],#, 50000],
                 # 'llp/theta': [1, 0.1],
                 # 'llp/q': [6],
                 # 'data/z_dims': [[0, 1, 2]],
@@ -984,15 +995,15 @@ if __name__ == '__main__':
                 # 'data/q_u': [2, 4],
                 # 'data/theta_u': [1, 3],
                 #
-                # 'data/path_dims': [],#[0, 1, 2], [0, 1, 2, 8]],
+                # 'data/path_dims': [[0, 1, 2]],#, [0, 1, 2, 8]],
                 # 'data/q_path': [0],#4, 6],
-                # 'data/theta_path': [0],#[1, 3],
+                # 'data/theta_path': [1.45],#[1, 3],
                 # "ens_args/radius" : [0.5, 0.8, 1, 1.2, 2, 3]
 
             },
             # labels=['1000', '2000', '5000'],
             show_error=True,
-            show_prediction=True,
+            show_prediction=False,
             save=True,
         )
 
@@ -1026,8 +1037,8 @@ if __name__ == '__main__':
         "data/path_key": "mean_shift_abs_max_scale_target",
         # "data/path_dims": [0, 1, 2],
         # "data/path_dims": [0, 1, 2],
-        # "data/q_path": 6,
-        # "data/theta_path": 0
+        # "data/q_path": 5,
+        "data/theta_path": 1.28
 
         # == llp ==
         # "llp/model_type": "mine",
@@ -1048,6 +1059,7 @@ if __name__ == '__main__':
         # "general/dt": 0.01,
         # "general/theta_p": [1]
     }
+
     # const_params = None
     script_name = 'nef_decode_llp_weight_TEST3'
     db_name = 'llp_pd_d_results'
@@ -1061,7 +1073,7 @@ if __name__ == '__main__':
             db_name=db_name,
             db_folder=db_folder,
             # ignore_keys=['general/theta_p', 'data/dataset_range'],
-            show_gt=True,
+            show_gt=False,
             show_prediction=True
         )
     # if 'abs' in sys.argv:
@@ -1084,7 +1096,8 @@ if __name__ == '__main__':
             db_name=db_name,
             db_folder=db_folder,
             # ignore_keys=['general/theta_p', 'data/dataset_range'],
-            show_gt=True,
+            # show_gt=True,
+            show_gt=False,
             show_prediction=True
         )
 

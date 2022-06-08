@@ -6,7 +6,7 @@ from masters_thesis.utils.eval_utils import RMSE, decode_ldn_data
 
 # Get template params that won't change
 # fname = '../parameter_sets/nni_nef_decode_params.json'
-fname = '../parameter_sets/params_0024.json'
+fname = '../parameter_sets/params_0025.json'
 with open(fname) as fp:
     json_params = json.load(fp)
 
@@ -17,6 +17,8 @@ cid = nni.get_sequence_id()
 
 json_params['data']['database_dir'] = f"../{json_params['data']['database_dir']}"
 json_params["llp"]["n_neurons"] = nni_params["n_neurons"]
+json_params["data"]["c_dims"] = nni_params["c_dims"]
+json_params["data"]["path_dims"] = nni_params["path_dims"]
 json_params["llp"]["q"] = nni_params["q"]
 json_params["data"]["q_c"] = nni_params["q_c"]
 json_params["data"]["theta_c"] = nni_params["theta_c"]
@@ -49,7 +51,7 @@ n_steps = target_pts.shape[0] #- theta_steps
 # RMSE between decoded GT and decoded network output
 RMSEs = np.zeros((n_steps, int(len(theta_p))))#, m))
 # RMSE beteween decoded GT and recorded state shifted in time
-# RMSEs_gt = np.zeros((n_steps, int(len(theta_p))))#, m))
+RMSEs_gt = np.zeros((n_steps, int(len(theta_p))))#, m))
 # print('PARAMS: ', json_params)
 # print('theta_p: ', theta_p)
 # print('theta: ', json_params['llp']['theta'])
@@ -74,10 +76,19 @@ for ii, tp in enumerate(theta_p):
     err = RMSE(x.T, xhat.T)
     RMSEs[:, ii] = err#[:, np.newaxis]
 
+    if t_steps == tp_steps:
+        err_gt = RMSE(z_state[tp_steps:, np.newaxis, :].T, x.T)
+    else:
+        err_gt = RMSE(z_state[tp_steps:-(t_steps-tp_steps), np.newaxis, :].T, x.T)
+    RMSEs_gt[:, ii] = err_gt
+
+
+
 # ===================================
 
 # nni.report_final_result(np.sum(RMSEs))
-err = np.mean(RMSEs)
+# Add ground truth error as this is the error of gt truth to recorded z shifted in time
+err = np.mean(RMSEs+RMSEs_gt)
 nni.report_final_result(err)
 print('final rmse: ', err)
 

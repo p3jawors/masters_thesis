@@ -478,13 +478,14 @@ def load_data_from_json(json_params):
             #     + f"{data_params['dataset']}/ldn_state/{sub_state_key}"
             # )
 
-    if len(data_params['path_dims']) > 0 and data_params['theta_path'] > 0:
+    if len(data_params['path_dims']) > 0 and data_params['theta_path'] > 0 and data_params['q_path'] > 0:
         sub_path = encode_ldn_data(
             theta=data_params['theta_path'],
             q=data_params['q_path'],
             z=sub_path,
             dt=params['dt']
         )
+        # if using path context, shift it by theta to get future value at time t
         # shift path to have context of planned future path theta sec into future
         theta_steps = int(data_params['theta_path']/params['dt'])
         sub_path = sub_path[theta_steps:, :]
@@ -493,6 +494,19 @@ def load_data_from_json(json_params):
         sub_ctrl = sub_ctrl[:-theta_steps, :]
         full_state = full_state[:-theta_steps, :]
 
+    elif len(data_params['path_dims']) > 0 and data_params['theta_path'] > 0:
+        # if using path context, shift it by theta to get future value at time t
+        # shift path to have context of planned future path theta sec into future
+        theta_steps = int(data_params['theta_path']/params['dt'])
+        sub_path = sub_path[theta_steps:, :]
+        # remove theta steps from end of remaining context so shape matches when stacking
+        sub_state = sub_state[:-theta_steps, :]
+        sub_ctrl = sub_ctrl[:-theta_steps, :]
+        full_state = full_state[:-theta_steps, :]
+
+    print('sub path: ', sub_path.shape)
+    print('ctrl: ', sub_ctrl.shape)
+    print('state: ', sub_state.shape)
     c_state = np.hstack((sub_state, sub_ctrl, sub_path))
     z_state = np.take(full_state, indices=data_params['z_dims'], axis=1)
 

@@ -13,7 +13,8 @@ import sys
 
 from nengo_interfaces.airsim import AirSim
 from nengo_control.controllers.quadrotor import PD
-from nengo_control.controllers.path_planners.path_planner_node import PathPlannerNode, ExitSim
+# from nengo_control.controllers.path_planners.path_planner_node import PathPlannerNode, ExitSim
+from masters_thesis.path_planner_node import PathPlannerNode, ExitSim
 from abr_control.controllers.path_planners import PathPlanner
 from abr_control.controllers.path_planners.position_profiles import Linear
 from abr_control.controllers.path_planners.velocity_profiles import Gaussian

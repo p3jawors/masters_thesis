@@ -10,24 +10,24 @@
         "state_key": "mean_shift_abs_max_scale_state",
         "z_dims": [0, 1, 2],
         "c_dims": [0, 1, 2, 3, 4, 5],
-        "q_c": 6,
-        "theta_c": 1.88,
+        "q_c": 5,
+        "theta_c": 4.86,
 
         "ctrl_key": "clean_u_2000",
         "u_dims": [0, 1, 2, 3],
-        "q_u": 7,
-        "theta_u": 3.2,
+        "q_u": 8,
+        "theta_u": 2.45,
 
         "path_key": "mean_shift_abs_max_scale_target",
-        "path_dims": [0, 1, 2],
-        "q_path": 5,
-        "theta_path": 1.45
+        "path_dims": [0, 1, 2, 3, 4, 5],
+        "q_path": 14,
+        "theta_path": 1.28
     },
    "llp": {
         "model_type": "mine",
         "n_neurons": 3000,
         "theta": 1,
-        "q": 5,
+        "q": 11,
         "q_a": 5,
         "q_p": 2,
         "learning_rate": 8.656205265024589e-7,

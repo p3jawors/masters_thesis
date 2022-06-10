@@ -25,13 +25,13 @@ view = False
 if len(sys.argv) > 1:
     view = sys.argv[1]
 
-db_name = 'llp_pd_e'
-database_dir = 'data/databases'
-train_data = '100_linear_targets_faster'
-
-# db_name = 'llp_pd_d'
+# db_name = 'llp_pd_e'
 # database_dir = 'data/databases'
-# train_data = '9999_linear_targets_faster' #  90820 temporal data points
+# train_data = '100_linear_targets_faster'
+
+db_name = 'llp_pd_d'
+database_dir = 'data/databases'
+train_data = '9999_linear_targets_faster' #  90820 temporal data points
 dat = DataHandler(
     db_name=db_name,
     database_dir=database_dir

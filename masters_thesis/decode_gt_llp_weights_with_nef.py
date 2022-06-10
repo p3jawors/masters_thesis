@@ -961,6 +961,7 @@ if __name__ == '__main__':
         # 'parameter_sets/params_0024_nni_best.json',
         # 'parameter_sets/params_0025.json',
         'parameter_sets/params_0025_nni_best.json',
+        # 'parameter_sets/rt_params_0001.json'
     ]
     load = False
     lookup = False
@@ -978,6 +979,7 @@ if __name__ == '__main__':
             json_fps=json_fps,
             # variation_dict=None,
             variation_dict = {
+                'data/test_range': [[200730, 220000]]
                 # 'data/ctrl_key': [
                 #     'clean_u_500',
                 #     'clean_u_1000',
@@ -1003,7 +1005,7 @@ if __name__ == '__main__':
             },
             # labels=['1000', '2000', '5000'],
             show_error=True,
-            show_prediction=False,
+            show_prediction=True,
             save=True,
         )
 
@@ -1017,13 +1019,14 @@ if __name__ == '__main__':
         # "data/dataset_range": [0, 58609],
         # "data/train_range": [0, 80000],
         # "data/test_range": [80000, 100000],
+        'data/test_range': [200730, 220000]
         # "data/test_range": [300000, 320000],
 
         # "data/state_key": "mean_shifted_normalized_ego_error",
         # "data/state_key": "state",
         # "data/state_key": "mean_shift_abs_max_scale_state",
         # "data/z_dims": [2],
-        # "data/c_dims": [0, 1, 2],
+        # "data/c_dims": [0, 1, 2, 3, 4, 5],
         # "data/q_c": 6,
         # "data/theta_c": 1.88,
 
@@ -1034,15 +1037,15 @@ if __name__ == '__main__':
         # "data/theta_u": 8.11,
 
         # "data/path_key": "target",
-        "data/path_key": "mean_shift_abs_max_scale_target",
+        # "data/path_key": "mean_shift_abs_max_scale_target",
         # "data/path_dims": [0, 1, 2],
         # "data/path_dims": [0, 1, 2],
         # "data/q_path": 5,
-        "data/theta_path": 1.28
+        # "data/theta_path": 1.28
 
         # == llp ==
         # "llp/model_type": "mine",
-        # "llp/n_neurons": 1000,
+        # "llp/n_neurons": 3000,
         # "llp/theta": 1,
         # "llp/q": 6,
         # "llp/q_a": 5,
@@ -1058,6 +1061,9 @@ if __name__ == '__main__':
         # "general/run_nni": false,
         # "general/dt": 0.01,
         # "general/theta_p": [1]
+
+        # == path ==
+        # "path/max_velocity": 6,
     }
 
     # const_params = None

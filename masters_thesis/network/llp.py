@@ -220,7 +220,11 @@ class LLP(nengo.Network):
 
             # For convenience, can output the legendre decoded output at various theta_p values
             if theta_p is not None:
-                self.zhat = nengo.Node(size_out=size_z*len(theta_p), size_in=size_z*len(theta_p))
+                self.zhat = nengo.Node(
+                    size_out=size_z*len(theta_p),
+                    size_in=size_z*len(theta_p),
+                    label='LLP Prediction'
+                )
                 for ii in range(0, size_z):
                     nengo.Connection(
                         self.Z[ii*q_p:(ii+1)*q_p], self.zhat[ii*len(theta_p):(ii+1)*len(theta_p)],

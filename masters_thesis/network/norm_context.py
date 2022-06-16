@@ -107,42 +107,10 @@ class NormPath(Network):
 
 
 class NormControl(Network):
-    def __init__(self, params, biases):
+    def __init__(self, params, biases, rt_control=True):
 
         super().__init__(seed=params['ens_args']['seed'])
 
-        self.input = nengo.Node(
-            size_in=4,
-            size_out=4,
-        )
-
-        def normalize_ctrl(t, x):
-            # norm_ctrl = np.empty(len(params['data']['ctrl_dims']))
-            norm_ctrl = []
-            # for dd, dim in enumerate(params['data']['ctrl_dims']):
-            for dim in params['data']['u_dims']:
-                norm_ctrl.append(
-                    (x[dim] - params['data']['ctrl_means'][dim])
-                    /params['data']['ctrl_scales'][dim]
-                )
-            norm_ctrl = np.clip(norm_ctrl, -1, 1)
-
-            return list(norm_ctrl)
-
-        self.ctrl_norm = nengo.Node(
-            normalize_ctrl,
-            size_in=4,
-            size_out=len(params['data']['u_dims']),
-            label=f"ctrl_normalized"
-        )
-
-        # TODO connect to predictive controller output after scaling up
-        nengo.Connection(
-            self.input,
-            self.ctrl_norm,
-            synapse=None,
-            label=f'norm_ctrl.input>ctrl_norms'
-        )
         self.ctrl_ldn = nengo.Node(
             LDN(
                 theta=params['data']['theta_u'],
@@ -150,13 +118,6 @@ class NormControl(Network):
                 size_in=len(params['data']['u_dims'])
             ),
             label=f'ldn_ctrl'
-        )
-
-        nengo.Connection(
-            self.ctrl_norm,
-            self.ctrl_ldn,
-            synapse=None,
-            label=f'ctrl_norms>ctrl_ldns'
         )
 
         # TODO add offset to control context and test
@@ -174,3 +135,48 @@ class NormControl(Network):
             synapse=None,
             label=f'bias_node>ctrl_ldn'
         )
+
+        # If only using as a predictor, need some baseline control to
+        # use as context. This will need to be normalized before being
+        # summed with the biais going into the LDN
+        if not rt_control:
+            self.input = nengo.Node(
+                size_in=4,
+                size_out=4,
+            )
+
+            def normalize_ctrl(t, x):
+                # norm_ctrl = np.empty(len(params['data']['ctrl_dims']))
+                norm_ctrl = []
+                # for dd, dim in enumerate(params['data']['ctrl_dims']):
+                for dim in params['data']['u_dims']:
+                    norm_ctrl.append(
+                        (x[dim] - params['data']['ctrl_means'][dim])
+                        /params['data']['ctrl_scales'][dim]
+                    )
+                norm_ctrl = np.clip(norm_ctrl, -1, 1)
+
+                return list(norm_ctrl)
+
+            self.ctrl_norm = nengo.Node(
+                normalize_ctrl,
+                size_in=4,
+                size_out=len(params['data']['u_dims']),
+                label=f"ctrl_normalized"
+            )
+
+            # TODO connect to predictive controller output after scaling up
+            nengo.Connection(
+                self.input,
+                self.ctrl_norm,
+                synapse=None,
+                label=f'norm_ctrl.input>ctrl_norms'
+            )
+
+            nengo.Connection(
+                self.ctrl_norm,
+                self.ctrl_ldn,
+                synapse=None,
+                label=f'ctrl_norms>ctrl_ldns'
+            )
+

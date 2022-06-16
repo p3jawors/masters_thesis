@@ -59,11 +59,14 @@ plotting.plot_data_distribution(
 )
 
 # print('dt: ', np.mean(np.diff(data['time'])))
+# print('shape: ', data['clean_u'].shape)
+# print('shape: ', np.diff(data['clean_u'], axis=0).shape)
 plotting.plot_data_distribution(
     # np.diff(data['clean_u'])/np.mean(np.diff(data['time'])),
-    np.diff(data['clean_u']),
+    np.diff(data['clean_u'], axis=0),
     dim_labels=['u_front_right', 'u_rear_left', 'u_front_left', 'u_rear_right'],
     title='Rate of Change of Control Signal: Gravity Removed, Clipped, Normalized',
-    save_name=f"{folder}rate_of_change_control-gravity_removed_clipped_norm_distribution.png"
+    save_name=f"{folder}rate_of_change_control-gravity_removed_clipped_norm_distribution.png",
+    bins=100
 )
 

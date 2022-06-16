@@ -264,7 +264,8 @@ def run(json_fp, model=None, gui=False, run_mpc=False):
             # HACK FOR WEIGHTS
             print("\nUSING HACKY WEIGHT LOADING AND SETTING LEARING TO 0\n")
             # with np.load('nef_rt_0001_weights.npz') as data:
-            with np.load("nef_rt_weights.npz") as data:
+            # with np.load("nef_rt_weights.npz") as data:
+            with np.load("nef_weights_rt_0000_750.npz") as data:
                 params["llp"]["decoders"] = np.reshape(
                     data["weights"].T,
                     (
@@ -292,10 +293,10 @@ def run(json_fp, model=None, gui=False, run_mpc=False):
                     f"{params['llp']['neuron_model']} is not a valid neuron model"
                 )
 
-            if run_mpc:
-                n_predictors = 1
-            else:
-                n_predictors = 0
+            # if run_mpc:
+            #     n_predictors = 1
+            # else:
+            #     n_predictors = 0
 
             # assert n_predictors <= 1 ("Currently not implemented for more predictors than one set of 8")
             predictors = []
@@ -307,9 +308,15 @@ def run(json_fp, model=None, gui=False, run_mpc=False):
 
             # selector_node = nengo.Node(lambda t, x: [list(x).index(min(x)), min(x)], size_in=2*n_predictors + 1, size_out=2)
             # Return index of min error, and min error
+            if run_mpc:
+                n_predictors = len(params['control']['bias_dist'])
+            else:
+                n_predictors = 0
+
             selector_node = nengo.Node(
                 lambda t, x: [list(x).index(min(x)), min(x)],
                 size_in=1 + n_predictors * 8,
+                # size_in=1 + len(params['control']['bias_dist']) * 8,
                 size_out=2,
             )
 
@@ -324,28 +331,30 @@ def run(json_fp, model=None, gui=False, run_mpc=False):
             del params["llp"]["model_type"]
 
             # NOTE this is the bias on the already normalized control (NOT in radians/sec)
-            bias = 0.05
-            # [front_right_pwm, rear_left_pwm, front_left_pwm, rear_right_pwm]
-            biases = [
-                # clockwise
-                [bias, bias, -bias, -bias],
-                # counterclockwise
-                [-bias, -bias, bias, bias],
-                # up
-                [bias, bias, bias, bias],
-                # down
-                [-bias, -bias, -bias, -bias],
-                # forward
-                [-bias, bias, -bias, bias],
-                # backward
-                [bias, -bias, bias, -bias],
-                # left
-                [bias, -bias, -bias, bias],
-                # right
-                [-bias, bias, bias, -bias],
-            ]
+            # bias = 0.0001
+            def biases(index, bias):
+                # [front_right_pwm, rear_left_pwm, front_left_pwm, rear_right_pwm]
+                bias_list = [
+                    # clockwise
+                    [bias, bias, -bias, -bias],
+                    # counterclockwise
+                    [-bias, -bias, bias, bias],
+                    # up
+                    [bias, bias, bias, bias],
+                    # down
+                    [-bias, -bias, -bias, -bias],
+                    # forward
+                    [-bias, bias, -bias, bias],
+                    # backward
+                    [bias, -bias, bias, -bias],
+                    # left
+                    [bias, -bias, -bias, bias],
+                    # right
+                    [-bias, bias, bias, -bias],
+                ]
+                return bias_list[index]
 
-            for pp in range(0, 8 * n_predictors + 1):
+            def init_llp_conns(llp_index, bias_step):
                 # params['ens_args']['label'] = f'LLP_ens_{pp}'
                 if model_type == "mine":
                     # scaling factor to better align with other model
@@ -396,16 +405,16 @@ def run(json_fp, model=None, gui=False, run_mpc=False):
                     decode_ldn_data,
                     size_in=len(params["data"]["z_dims"]) * params["llp"]["q"],
                     size_out=len(params["data"]["z_dims"]),
-                    label=f"zhat_{pp}",
+                    label=f"zhat_{bias_step}_{llp_index}",
                 )
                 nengo.Connection(predictors[-1].Z, predictors[-1].zhat, synapse=None)
 
-                if pp == 0:
-                    bias = [0, 0, 0, 0]
-                else:
-                    bias = biases[pp - 1]
+                # if pp == 0:
+                #     bias = [0, 0, 0, 0]
+                # else:
+                #     bias = biases(index=pp - 1, bias=bias_step)
 
-                encoded_ctrls.append(norm_context.NormControl(params, bias))
+                encoded_ctrls.append(norm_context.NormControl(params, bias_step, run_mpc))
 
                 # NOTE control added lower down after u_mpc is defined
                 nengo.Connection(
@@ -431,29 +440,6 @@ def run(json_fp, model=None, gui=False, run_mpc=False):
                 nengo.Connection(z_node, predictors[-1].z, synapse=None)
 
 
-                # Keep que of all control options and select one based on output of selector node
-                def ctrl_que_func(t, x):
-                    # receives all control options given the mpc bias variatons
-                    index = x[-1]
-                    # select the slice that has the lowest predicted error
-                    u_mpc = x[int(index*4):int((index+1)*4)]
-                    return u_mpc
-
-                # size in is 8 ctrl variations*n_predictors, + 1 for baseline, all
-                # * 4 since 4 ctrl signals per variation, + 1 for index of selected ctrl
-                ctrl_que = nengo.Node(
-                    ctrl_que_func,
-                    size_in=(8*n_predictors+1)*4 + 1,
-                    size_out=4,
-                    label='selected_mpc_ctrl'
-                )
-                # Add base
-                nengo.Connection(encoded_ctrls[-1].ctrl_norm, ctrl_que[pp*4:(pp+1)*4], synapse=None)
-                # Add bias
-                nengo.Connection(encoded_ctrls[-1].bias_node, ctrl_que[pp*4:(pp+1)*4], synapse=None)
-                # Add index of selection
-                nengo.Connection(selector_node[0], ctrl_que[-1], synapse=None)
-
                 # denormalize our prediction
                 # TODO test denormalizing function
                 def denormalize_state(t, x):
@@ -473,7 +459,7 @@ def run(json_fp, model=None, gui=False, run_mpc=False):
                         denormalize_state,
                         size_in=len(params["data"]["z_dims"]),
                         size_out=len(params["data"]["z_dims"]),
-                        label=f"denormalize_prediction_{pp}",
+                        label=f"denormalize_prediction_{bias_step}_{llp_index}",
                     )
                 )
 
@@ -496,43 +482,88 @@ def run(json_fp, model=None, gui=False, run_mpc=False):
                         calc_error,
                         size_in=12 + len(params["data"]["z_dims"]),
                         size_out=1,
-                        label=f"predicted_error_{pp}",
+                        label=f"predicted_error_{bias_step}_{llp_index}",
                     )
                 )
                 nengo.Connection(
                     path_node_future.output,
                     predicted_errors[-1][:12],
                     synapse=None,
-                    label=f"future_path>error_calc_{pp}",
+                    label=f"future_path>error_calc_{bias_step}_{llp_index}",
                 )
                 nengo.Connection(
                     denormed_predictions[-1],
                     predicted_errors[-1][12:],
                     synapse=None,
-                    label=f"denormed_pred>error_calc_{pp}",
+                    label=f"denormed_pred>error_calc_{bias_step}_{llp_index}",
                 )
 
+                print('LLP INDEX: ', llp_index)
                 nengo.Connection(
                     predicted_errors[-1],
-                    selector_node[pp],
+                    selector_node[llp_index],
+                    # selector_node[bb*8 + (llp_index-1) + 1],
                     synapse=None,
-                    label=f"predicted_error_{pp}>selector_node",
+                    label=f"predicted_error_{bias_step}_{llp_index}>selector_node",
                 )
 
                 # add probes for plotting
                 # probes['ctrl'] = nengo.Probe(ctrl_node, synapse=0)
-                probes[f"z_{pp}"] = nengo.Probe(predictors[-1].z, synapse=None)
-                probes[f"c_{pp}"] = nengo.Probe(predictors[-1].c, synapse=None)
-                probes[f"zhat_{pp}"] = nengo.Probe(predictors[-1].zhat, synapse=None)
-                probes[f"Z_{pp}"] = nengo.Probe(predictors[-1].Z, synapse=None)
-                probes[f"norm_ctrl_{pp}"] = nengo.Probe(
-                    encoded_ctrls[-1].ctrl_norm, synapse=None
-                )
-                probes[f"ldn_ctrl_{pp}"] = nengo.Probe(
+                probes[f"z_{bias_step}_{llp_index}"] = nengo.Probe(predictors[-1].z, synapse=None)
+                probes[f"c_{bias_step}_{llp_index}"] = nengo.Probe(predictors[-1].c, synapse=None)
+                probes[f"zhat_{bias_step}_{llp_index}"] = nengo.Probe(predictors[-1].zhat, synapse=None)
+                probes[f"Z_{bias_step}_{llp_index}"] = nengo.Probe(predictors[-1].Z, synapse=None)
+                if not run_mpc:
+                    probes[f"norm_ctrl_{bias_step}_{llp_index}"] = nengo.Probe(
+                        encoded_ctrls[-1].ctrl_norm, synapse=None
+                    )
+                probes[f"ldn_ctrl_{bias_step}_{llp_index}"] = nengo.Probe(
                     encoded_ctrls[-1].ctrl_ldn, synapse=None
                 )
 
+            # central llp
+            init_llp_conns(0, [0, 0, 0, 0])
+
+            # control variations
+            if run_mpc:
+                for bb, bias_step in enumerate(params['control']['bias_dist']):
+                    # for pp in range(0, 8 * n_predictors + 1):
+                    # for pp in range(1, 9):
+                    for pp in range(0, 8):
+                        init_llp_conns(
+                            llp_index=1 + (bb*8) + pp,
+                            bias_step=biases(index=pp-1, bias=bias_step)
+                        )
+
+            # Keep que of all control options and select one based on output of selector node
+            def ctrl_que_func(t, x):
+                if t > params['general']['dt']*150:
+                    # print(f"{t}: {x}")
+                    # receives all control options given the mpc bias variatons
+                    index = x[-1]
+                    # select the slice that has the lowest predicted error
+                    u_mpc = x[int(index*4):int((index+1)*4)]
+                    # print('MPC control')
+                else:
+                    # u_mpc = [0.05, 0.05, 0.05, 0.05]
+                    u_mpc = [0.35, 0.35, 0.35, 0.35]
+                return u_mpc
+
+            # size in is 8 ctrl variations*n_predictors, + 1 for baseline, all
+            # * 4 since 4 ctrl signals per variation, + 1 for index of selected ctrl
+            ctrl_que = nengo.Node(
+                ctrl_que_func,
+                size_in=(8*n_predictors+1)*4 + 1,
+                # size_in=(8*len(params['control']['bias_dist'])+1)*4 + 1,
+                size_out=4,
+                label='selected_mpc_ctrl'
+            )
+
+            # Add index of selection
+            nengo.Connection(selector_node[0], ctrl_que[-1], synapse=None)
+
             # nengo.Connection(predictors[0].zhat, sim_extras[[12, 13, 14]], synapse=None)
+            # show central controller prediction
             nengo.Connection(
                 denormed_predictions[0], sim_extras[[12, 13, 14]], synapse=None
             )
@@ -541,33 +572,33 @@ def run(json_fp, model=None, gui=False, run_mpc=False):
             def denormalize_ctrl(t, x):
                 norm_ctrl = np.copy(x)
                 denorm_ctrl = []
-                if t > 1:#/params['general']['dt']:
-                    print('STARTING MPC')
-                    for dd, dim in enumerate(x):
-                        denorm_ctrl.append(
-                            dim
-                            * params['data']['ctrl_scales'][dd]
-                            + params['data']['ctrl_means'][dd]
-                        )
-                    print('MPC: ', denorm_ctrl)
-                else:
-                    print('STARTUP SIGNAL')
-                    denorm_ctrl = [7000] * 4
+                # if t > 1:#/params['general']['dt']:
+                # print('STARTING MPC')
+                for dd, dim in enumerate(x):
+                    denorm_ctrl.append(
+                        dim
+                        * params['data']['ctrl_scales'][dd]
+                        + params['data']['ctrl_means'][dd]
+                    )
+                #     # print('MPC: ', denorm_ctrl)
+                # else:
+                #     # print('STARTUP SIGNAL')
+                #     denorm_ctrl = [7000] * 4
 
                 return [
-                    denorm_ctrl[0], denorm_ctrl[1], denorm_ctrl[2], denorm_ctrl[3],
-                    norm_ctrl[0], norm_ctrl[1], norm_ctrl[2], norm_ctrl[3]
+                    denorm_ctrl[0], denorm_ctrl[1], denorm_ctrl[2], denorm_ctrl[3]#,
+                    # norm_ctrl[0], norm_ctrl[1], norm_ctrl[2], norm_ctrl[3]
                 ]
 
 
             u_mpc = nengo.Node(
                 denormalize_ctrl,
                 size_in=len(params["data"]["u_dims"]),
-                size_out=len(params["data"]["u_dims"])*2,
+                size_out=len(params["data"]["u_dims"]),# *2,
                 label=f"denormalize_u_mpc",
             )
 
-            probes[f"u_mpc_norm"] = nengo.Probe(selector_node, synapse=None)
+            # probes[f"u_mpc_norm"] = nengo.Probe(selector_node, synapse=None)
             probes[f"u_mpc"] = nengo.Probe(u_mpc, synapse=None)
 
             nengo.Connection(ctrl_que, u_mpc, synapse=None)
@@ -577,8 +608,19 @@ def run(json_fp, model=None, gui=False, run_mpc=False):
                 nengo.Connection(u_mpc[:4], interface_node[:4], synapse=0)
 
                 for pp, enc_ctrl in enumerate(encoded_ctrls):
+                    # Add base, which is the input control+bias of the predictor
+                    # with the lowest error from the last step
+                    # This is also the output from the ctrl_que, so setup feedback
+                    # connection
+                    # nengo.Connection(enc_ctrl.ctrl_norm, ctrl_que[pp*4:(pp+1)*4], synapse=None)
+                    nengo.Connection(ctrl_que, ctrl_que[pp*4:(pp+1)*4], synapse=0)
+                    # Add bias
+                    # NOTE should synapse match connection of baseline?
+                    nengo.Connection(enc_ctrl.bias_node, ctrl_que[pp*4:(pp+1)*4], synapse=None)
+
                     nengo.Connection(
-                        u_mpc[4:],
+                        # u_mpc[4:],
+                        ctrl_que, # need the normalized control, not the one sent to drone
                         enc_ctrl.ctrl_ldn,
                         synapse=0,
                         label=f"ctrl_mpc>ctrl_ldn_{pp}",
@@ -588,7 +630,7 @@ def run(json_fp, model=None, gui=False, run_mpc=False):
                 # connect pd controller output to our sim input
                 nengo.Connection(ctrl_node, interface_node[:4], synapse=0)
 
-                for enc_ctrl in encoded_ctrls:
+                for pp, enc_ctrl in enumerate(encoded_ctrls):
                     nengo.Connection(
                         ctrl_node,
                         enc_ctrl.ctrl_norm,
@@ -649,4 +691,4 @@ if __name__ == "__main__":
     json_fp = "parameter_sets/rt_params_0000.json"
     # json_fp = 'parameter_sets/rt_params_0001.json'
     model = nengo.Network()
-    run(json_fp, model, gui=False, run_mpc=True)
+    run(json_fp, model, gui=False, run_mpc=False)

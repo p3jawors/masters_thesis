@@ -960,7 +960,8 @@ if __name__ == '__main__':
         # 'parameter_sets/params_0024.json',
         # 'parameter_sets/params_0024_nni_best.json',
         # 'parameter_sets/params_0025.json',
-        'parameter_sets/params_0025_nni_best.json',
+        # 'parameter_sets/params_0025_nni_best.json',
+        'parameter_sets/rt_params_0000.json'
         # 'parameter_sets/rt_params_0001.json'
     ]
     load = False
@@ -979,14 +980,14 @@ if __name__ == '__main__':
             json_fps=json_fps,
             # variation_dict=None,
             variation_dict = {
-                'data/test_range': [[200730, 220000]]
+                # 'data/test_range': [[200730, 220000]]
                 # 'data/ctrl_key': [
                 #     'clean_u_500',
                 #     'clean_u_1000',
                 #     'clean_u_2000',
                 #     'clean_u_3000'
                 # ],
-                # 'llp/n_neurons': [500],#, 50000],
+                # 'llp/n_neurons': [100, 500, 750, 1000, 2000, 3000],#, 50000],
                 # 'llp/theta': [1, 0.1],
                 # 'llp/q': [6],
                 # 'data/z_dims': [[0, 1, 2]],

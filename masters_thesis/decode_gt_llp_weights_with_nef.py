@@ -2,6 +2,7 @@ import nengo
 import sys
 import numpy as np
 from abr_analyze import DataHandler
+from abr_analyze.data_processor import get_mean_and_ci
 from itertools import product
 import json
 import hashlib
@@ -340,7 +341,14 @@ def load_results(
         db_folder=None,
         ignore_keys=None,
         show_gt=False,
-        show_prediction=False):
+        show_constants=False,
+        show_prediction=False,
+        alternate_legend_keys=None,
+        ci=False):
+    """
+    """
+    if ci:
+        ci_errors = []
 
     saved_exp_hashes, all_constants, legend_keys, const_params = get_common_experiments(
             script_name, const_params, db_name, db_folder, ignore_keys)
@@ -381,6 +389,43 @@ def load_results(
     #     # all_constants, legend_keys = compare_all_keys(dat, saved_exp_hashes, parameter_stems=['llp', 'data', 'general', 'ens_args'])
     #     const_params = all_constants.keys
 
+    if alternate_legend_keys is not None:
+        const_params = {}
+        const_keys = []
+        # loop through key - alternate pairs
+        for key, alternate in alternate_legend_keys.items():
+            # if key not in legend keys, then it is a constant parameter
+            if key not in legend_keys:
+                # create const_params with the alternate legend keys
+                const_params[alternate] = dat.load(
+                    save_location=f'params/{saved_exp_hashes[0]}',
+                    parameters=[key])[key]
+        print(const_params)
+        all_constants = const_params
+    # raise Exception
+
+    # if ignore_keys is not None:
+    #     sub_constants = {}
+    #     for key in ignore_keys:
+    #         subkeys = key.split('/')
+    #         exists = True
+    #         tmp = all_constants
+    #         for ss, subkey in enumerate(subkeys):
+    #             if subkey in tmp.keys():
+    #                 tmp = tmp[subkey]
+    #                 exists = True
+    #             else:
+    #                 exists = False
+    #                 continue
+    #         print(f"{subkeys} exist? {exists}")
+    #         if not exists:
+    #             for ss, subkey in enumerate(subkeys):
+    #                 if isinstance(all_constants[subkey], dict):
+    #                     sub_constants[subkey] = {}
+    # raise Exception
+    #         # for ss, subkey in enumerate(subkeys):
+
+
     figure = None
     axs = None
     for mm, match in enumerate(saved_exp_hashes):
@@ -419,7 +464,31 @@ def load_results(
             if kk > 0 and kk < len(legend_keys):
                 name += " | "
             # name += f"{key.split('/')[-1]}={name_params[key]}"
-            name += f"{key}={name_params[key]}"
+            if alternate_legend_keys is not None and key in alternate_legend_keys.keys():
+                # if 'Dim' in alternate_legend_keys[key]:
+                #     val = []
+                #     greek_states = [
+                #         "x",
+                #         "y",
+                #         "z",
+                #         r"$\mathrm{\dot{x}}$",
+                #         r"$\mathrm{\dot{y}}$",
+                #         r"$\mathrm{\dot{z}}$",
+                #         r"$\mathrm{\alpha}$",
+                #         r"$\mathrm{\beta}$",
+                #         r"$\mathrm{\gamma}$",
+                #         r"$\mathrm{\dot{\alpha}}$",
+                #         r"$\mathrm{\dot{\beta}}$",
+                #         r"$\mathrm{\dot{\gamma}}$",
+                #     ]
+                #     for dim in name_params[key]:
+                #         val.append(greek_states[dim])
+                # else:
+                val = name_params[key]
+                name += f"{alternate_legend_keys[key]}={val}"
+            else:
+                name += f"{key}={name_params[key]}"
+            print(name)
 
         # print('======')
         # print(match)
@@ -448,7 +517,8 @@ def load_results(
         constants_printout = None
         if mm+1 == len(saved_exp_hashes):
             save_fig = True
-            constants_printout = all_constants
+            if show_constants:
+                constants_printout = all_constants
         show = save_fig
 
         if show_prediction:
@@ -470,7 +540,7 @@ def load_results(
                 # ),
                 theta_p=[pred_data['llp/theta']],
                 # theta_p=[0, 1.0],
-                prediction_dim_labs=['X', 'Y', 'Z'],
+                prediction_dim_labs=['X [normalized]', 'Y [normalized]', 'Z [normalized]'],
                 z_state=z_state,#[theta_steps:]
                 # theta_steps=pred_data['llp/theta']/pred_data['general/dt'],
                 # xlim=[0, 1000],
@@ -495,32 +565,59 @@ def load_results(
 
         # print('Plotting')
         # title = f"Error over Theta_p\n{const_params}"
-        title = "Error over Theta_p"
+        # title = "Error over Theta_p"
+        # title = None
         # if len(title) > 30:
         #     title = '\n'.join(x for x in title.split(','))
-        figure, axs = plotting.plot_mean_time_error_vs_theta_p(
-            theta_p = np.linspace(
-                    params['general/dt'],
-                    params['llp/theta'],
-                    10
-                ),
-            errors=RMSEs[:, :, np.newaxis],
-            dt=params['general/dt'],
-            theta=params['llp/theta'],
-            figure=figure,
-            title=title,
-            axs=axs,
-            show=show,
-            legend_label=name,
-            save=save_fig,
-            folder='data',
-            label="",#f"{save_name.replace('.', '_').replace('/', '_')}_"
-            prediction_dim_labs=['XYZ'],
-            all_constants=constants_printout,
-            errors_gt=RMSE_gt,
-        )
-
-
+        if not ci:
+            figure, axs = plotting.plot_mean_time_error_vs_theta_p(
+                theta_p = np.linspace(
+                        params['general/dt'],
+                        params['llp/theta'],
+                        10
+                    ),
+                errors=RMSEs[:, :, np.newaxis],
+                dt=params['general/dt'],
+                theta=params['llp/theta'],
+                figure=figure,
+                # title=title,
+                axs=axs,
+                show=show,
+                legend_label=name,
+                save=save_fig,
+                folder='data',
+                label="",#f"{save_name.replace('.', '_').replace('/', '_')}_"
+                prediction_dim_labs=['XYZ'],
+                all_constants=constants_printout,
+                errors_gt=RMSE_gt,
+            )
+        elif ci and not show:
+            print(data['RMSE'].shape)
+            ci_errors.append(np.mean(data['RMSE'], axis=0))
+        elif ci:
+            print('FINAL: ', np.asarray(ci_errors).shape)
+            ci = get_mean_and_ci(ci_errors)
+            figure, axs = plotting.plot_mean_time_error_vs_theta_p_with_ci(
+                theta_p = np.linspace(
+                        params['general/dt'],
+                        params['llp/theta'],
+                        10
+                    ),
+                errors=ci,
+                dt=params['general/dt'],
+                theta=params['llp/theta'],
+                figure=figure,
+                # title=title,
+                axs=axs,
+                show=show,
+                legend_label=name,
+                save=save_fig,
+                folder='data',
+                label="",#f"{save_name.replace('.', '_').replace('/', '_')}_"
+                prediction_dim_labs=['XYZ'],
+                all_constants=constants_printout,
+                errors_gt=RMSE_gt,
+            )
 
 
     # TODO update load to load all data if parameters is None
@@ -836,7 +933,8 @@ def compare_abs_error(
             fig=fig,
             axs=axs,
             show=len(saved_exp_hashes)==hh+1,
-            all_constants=consts_to_show
+            all_constants=consts_to_show if len(saved_exp_hashes) > 1 else None,
+            ylim=(0, 0.1)
         )
 
 
@@ -961,8 +1059,10 @@ if __name__ == '__main__':
         # 'parameter_sets/params_0024_nni_best.json',
         # 'parameter_sets/params_0025.json',
         # 'parameter_sets/params_0025_nni_best.json',
-        'parameter_sets/rt_params_0000.json'
+        # 'parameter_sets/rt_params_0000.json'
         # 'parameter_sets/rt_params_0001.json'
+        # 'parameter_sets/params_thesis.json',
+        'parameter_sets/params_thesis_best.json',
     ]
     load = False
     lookup = False
@@ -980,34 +1080,69 @@ if __name__ == '__main__':
             json_fps=json_fps,
             # variation_dict=None,
             variation_dict = {
-                # 'data/test_range': [[200730, 220000]]
+                'data/test_range': [
+                    [100000, 150000],
+                    [150000, 200000],
+                    [200000, 250000],
+                    [250000, 300000],
+                    [300000, 350000],
+                    [350000, 400000],
+                    [400000, 450000],
+                    [450000, 500000],
+                    [500000, 550000],
+                    [550000, 600000],
+                    [600000, 650000],
+                    [650000, 700000],
+                    [700000, 750000],
+                    [750000, 800000],
+                    [800000, 850000],
+                    [850000, 900000],
+                    [900000, 950000],
+                    [950000, 1000000]
+                ],
                 # 'data/ctrl_key': [
                 #     'clean_u_500',
                 #     'clean_u_1000',
                 #     'clean_u_2000',
                 #     'clean_u_3000'
                 # ],
-                # 'llp/n_neurons': [100, 500, 750, 1000, 2000, 3000],#, 50000],
+                # 'llp/n_neurons': [1000, 2000, 3000],#, 50000],
+                # 'llp/n_neurons': [100, 500, 1000, 1500, 2000, 2500],#, 50000],
                 # 'llp/theta': [1, 0.1],
                 # 'llp/q': [6],
                 # 'data/z_dims': [[0, 1, 2]],
-                # 'data/c_dims': [[0, 1, 2], [0, 1, 2, 8]],
+                # 'data/c_dims': [
+                #     [0, 1, 2],
+                    # [0, 1, 2, 8],
+                    # [0, 1, 2, 3, 4, 5],
+                    # [0, 1, 2, 6, 7, 8],
+                    # [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+                # ],
                 # 'data/q_c': [4, 6],
-                # 'data/theta_c': [1, 3],
+                # 'data/theta_c': [1],#, 3],
                 #
                 # 'data/q_u': [2, 4],
-                # 'data/theta_u': [1, 3],
+                # 'data/theta_u': [1],#, 3],
                 #
                 # 'data/path_dims': [[0, 1, 2]],#, [0, 1, 2, 8]],
+                # 'data/path_dims': [
+                    # [0, 1, 2],
+                    # [0, 1, 2, 8],
+                    # [0, 1, 2, 3, 4, 5],
+                    # [0, 1, 2, 6, 7, 8],
+                    # [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+                # ],
+
                 # 'data/q_path': [0],#4, 6],
-                # 'data/theta_path': [1.45],#[1, 3],
+                # 'data/theta_path': [1],#, 3],
                 # "ens_args/radius" : [0.5, 0.8, 1, 1.2, 2, 3]
 
             },
             # labels=['1000', '2000', '5000'],
-            show_error=True,
-            show_prediction=True,
+            show_error=False,
+            show_prediction=False,
             save=True,
+            # save=False,
         )
 
     # NOTE Current implementation for loading results and plotting
@@ -1017,38 +1152,39 @@ if __name__ == '__main__':
         # "data/db_name": "llp_pd_d",
         # "data/database_dir": "data/databases",
         # "data/dataset": "9999_linear_targets_faster",
-        # "data/dataset_range": [0, 58609],
-        # "data/train_range": [0, 80000],
+        # "data/dataset_range": [0, 100000],
+        "data/train_range": [0, 80000],
         # "data/test_range": [80000, 100000],
-        'data/test_range': [200730, 220000]
+        # 'data/test_range': [200730, 220000]
         # "data/test_range": [300000, 320000],
 
         # "data/state_key": "mean_shifted_normalized_ego_error",
         # "data/state_key": "state",
-        # "data/state_key": "mean_shift_abs_max_scale_state",
+        "data/state_key": "mean_shift_abs_max_scale_state",
         # "data/z_dims": [2],
         # "data/c_dims": [0, 1, 2, 3, 4, 5],
-        # "data/q_c": 6,
-        # "data/theta_c": 1.88,
+        "data/q_c": 5,
+        # "data/theta_c": 4.86,
 
-        # "data/ctrl_key": "clean_u_2000",
+        "data/ctrl_key": "clean_u_2000",
         # "data/u_dims": [],
         # "data/u_dims": [0, 1, 2, 3],
-        # "data/q_u": 0,
-        # "data/theta_u": 8.11,
+        "data/q_u": 8,
+        # "data/theta_u": 1,
 
         # "data/path_key": "target",
-        # "data/path_key": "mean_shift_abs_max_scale_target",
+        "data/path_key": "mean_shift_abs_max_scale_target",
+        # "data/path_dims": [0, 1, 2, 3, 4, 5],
         # "data/path_dims": [0, 1, 2],
-        # "data/path_dims": [0, 1, 2],
-        # "data/q_path": 5,
-        # "data/theta_path": 1.28
+        "data/q_path": 5,
+        "data/theta_path": 1.28,
+        # "data/theta_path": 2
 
         # == llp ==
         # "llp/model_type": "mine",
-        # "llp/n_neurons": 3000,
+        "llp/n_neurons": 3000,
         # "llp/theta": 1,
-        # "llp/q": 6,
+        "llp/q": 5,
         # "llp/q_a": 5,
         # "llp/q_p": 2,
         # "llp/learning_rate": 8.656205265024589e-7,
@@ -1097,6 +1233,34 @@ if __name__ == '__main__':
     #     )
 
     if load:
+        # To use different labels in plot that the keys in the params jsono
+        alternate_legend_keys = {
+            'data/z_dims': 'Prediction Dims',
+            'data/c_dims': 'State Dims',
+            'data/theta_c': r"$\mathrm{\theta}_x$",
+            'data/q_c': 'q_x',
+
+            'data/u_dims': 'Control Dims',
+            'data/theta_u': r"$\mathrm{\theta}_u$",
+            'data/q_u': 'q_u',
+
+            'data/path_dims': 'Path Dims',
+            'data/theta_path': r"$\mathrm{\theta}_r$",
+            'data/q_path': 'q_r',
+
+            'llp/n_neurons': 'n_neurons',
+            'llp/theta': r"$\mathrm{\theta}_r$",
+            'llp/q': 'q',
+            # 'llp/q_a': 'q_a',
+            # 'llp/q_p': 'q_p',
+        }
+        ignore_keys = [
+            'data/db_name', 'data/database_dir', 'data/dataset', 'data/dataset_range',
+            'data/train_range', 'data/test_range', 'data/state_key', 'data/ctrl_key',
+            'data/path_key', 'llp/model_type', 'llp/neuron_model', 'ens_args/seed',
+            'ens_args/radius', 'general/run_nni', 'general/dt', 'general/theta_p',
+            'llp/learning_rate', 'llp/q_a', 'llp/q_p',
+        ]
         load_results(
             script_name=script_name,
             const_params=const_params,
@@ -1105,7 +1269,11 @@ if __name__ == '__main__':
             # ignore_keys=['general/theta_p', 'data/dataset_range'],
             # show_gt=True,
             show_gt=False,
-            show_prediction=True
+            show_prediction=False,
+            ignore_keys=ignore_keys,
+            alternate_legend_keys=alternate_legend_keys,
+            show_constants=True,
+            ci=True
         )
 
     if lookup:

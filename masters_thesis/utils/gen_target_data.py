@@ -55,7 +55,15 @@ labs = [
 new_state = np.empty(data['target'].shape)
 for ii in range(0, data['target'].shape[1]):
     dim = data['target'][:, ii]
-    new_state[:, ii] = (dim - np.mean(dim))/np.amax(abs(dim-np.mean(dim)))
+    if ii < 11:
+        if ii in [6, 7, 9, 10]:
+            new_state[:, ii] = np.zeros(data['target'].shape[0])
+        else:
+            new_state[:, ii] = (dim - np.mean(dim))/np.amax(abs(dim-np.mean(dim)))
+    else:
+        clip_val = 2
+        dim = np.clip(dim, -clip_val, clip_val)
+        new_state[:, ii] = (dim - np.mean(dim))/clip_val
     print('---------')
     print('DIM: ', ii)
     print('MEAN: ', np.mean(dim))

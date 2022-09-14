@@ -531,6 +531,31 @@ def load_data_from_json(json_params):
 
     return loaded_json_params, c_state, z_state, times
 
+def world_to_body_frame(positions, yaws):
+    """
+    Takes in 3D world position and yaw, returns 3D egocentric position
+    Parameters
+    """
+    # get our current orientation as a quaternion
+    body_xyz = []
+    for xyz, yaw in zip(positions, yaws):
+        rot_matrix = np.array([
+            [np.cos(yaw), -np.sin(yaw), 0],
+            [np.sin(yaw), np.cos(yaw), 0],
+            [0, 0, 1]
+        ])
+
+        cz = np.cos(yaw)
+        sz = np.sin(yaw)
+
+        pos_body = [
+            xyz[0] * cz + xyz[1] * sz,
+            -xyz[0] * sz + xyz[1] * cz,
+            xyz[2]
+        ]
+        body_xyz.append(pos_body)
+    return np.asarray(body_xyz)
+
 if __name__ == '__main__':
     q=5
     d=3

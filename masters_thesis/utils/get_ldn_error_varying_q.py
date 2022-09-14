@@ -1,7 +1,7 @@
 """
 Test LDN ability to represent activities and our state predictions
 """
-from masters_thesis.utils.eval_utils import calc_ldn_repr_err
+from masters_thesis.utils.eval_utils import calc_ldn_err_vs_q
 import matplotlib.pyplot as plt
 import numpy as np
 from masters_thesis.utils import plotting
@@ -41,7 +41,7 @@ if to_show in ['Z', 'prediction']:
             prediction_dim_labs.append(f"{jj}_{ii}")
     label = 'LDN of Prediction'
     qvals = [5]
-    error, zhats = calc_ldn_repr_err(
+    error, zhats = calc_ldn_err_vs_q(
         z, qvals, theta, theta_p, dt=dt, return_zhat=True)
     plotting.plot_ldn_repr_error(
         error, theta, theta_p, z, dt, zhats, prediction_dim_labs,
@@ -49,13 +49,13 @@ if to_show in ['Z', 'prediction']:
         folder='data/presentation_figures/',
         save_name='LDN_prediction_Z')
 
-elif to_show in ['act', 'activites', 'neurons', 'spikes']:
+elif to_show in ['act', 'activities', 'neurons', 'spikes']:
     z = act[:n_steps, :3]
     prediction_dim_labs = ['neuron0', 'neuron1', 'neuron2']
     label = 'Neural Activities'
     qvals = [6]
 
-    error, zhats = calc_ldn_repr_err(
+    error, zhats = calc_ldn_err_vs_q(
         z, qvals, theta, theta_p, dt=dt, return_zhat=True)
 
     plotting.plot_ldn_repr_error(
@@ -76,7 +76,7 @@ elif to_show in ['state', 'context', 'c']:
     prediction_dim_labs = ['x', 'y', 'z']
     label = 'Input Context and GT'
     qvals = [4]
-    error, zhats = calc_ldn_repr_err(
+    error, zhats = calc_ldn_err_vs_q(
         z, qvals, theta, theta_p, dt=dt, return_zhat=True)
 
     # print(zhats['4'].shape)

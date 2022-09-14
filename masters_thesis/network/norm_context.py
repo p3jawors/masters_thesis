@@ -135,11 +135,13 @@ class NormControl(Network):
             synapse=None,
             label=f'bias_node>ctrl_ldn'
         )
-
         # If only using as a predictor, need some baseline control to
         # use as context. This will need to be normalized before being
         # summed with the biais going into the LDN
         if not rt_control:
+           # TODO connect to predictive controller output after scaling up
+            # Only connected if using as predictor. When used as controller
+            # then connections are made externally
             self.input = nengo.Node(
                 size_in=4,
                 size_out=4,
@@ -165,7 +167,14 @@ class NormControl(Network):
                 label=f"ctrl_normalized"
             )
 
-            # TODO connect to predictive controller output after scaling up
+            nengo.Connection(
+                self.ctrl_norm,
+                self.ctrl_ldn,
+                synapse=None,
+                label=f'ctrl_norms>ctrl_ldns'
+            )
+
+
             nengo.Connection(
                 self.input,
                 self.ctrl_norm,
@@ -173,10 +182,4 @@ class NormControl(Network):
                 label=f'norm_ctrl.input>ctrl_norms'
             )
 
-            nengo.Connection(
-                self.ctrl_norm,
-                self.ctrl_ldn,
-                synapse=None,
-                label=f'ctrl_norms>ctrl_ldns'
-            )
 

@@ -57,6 +57,7 @@ class LLP(nengo.Network):
         if ens_args is None:
             ens_args = {'radius': 1}
 
+        self.error = 0
         self.theta = theta
         # if learning_rate != 0.0:
         if learning:
@@ -71,7 +72,7 @@ class LLP(nengo.Network):
         d = self.generate_delta_identity(q_a, q_r)
 
         # print("\n\n\nCHECK RESHAPING OF A, M, and Q IN LLP\n\n\n")
-        print("\n\n\nTRY DIFFERENT INIAL WEIGHTS FOR LLP\n\n\n")
+        # print("\n\n\nTRY DIFFERENT INIAL WEIGHTS FOR LLP\n\n\n")
         shapes = {
                 'A': (n_neurons, q_a),
                 # 'M': (q_p, size_out, q),
@@ -172,12 +173,20 @@ class LLP(nengo.Network):
                     zd = np.einsum("m, ar->mar", z, d)
                     # MQS = np.einsum("pmq, qapr->mar", M, QS)
                     MQS = np.einsum("mqp, qapr->mar", M, QS)
-                    error = np.subtract(MQS,  zd)
-                    dD = -learning_rate * np.einsum("Na, mar->Nrm", A, error)
+                    self.error = np.subtract(MQS,  zd)
+                    dD = -learning_rate * np.einsum("Na, mar->Nrm", A, self.error)
                     self.decoders += dD
 
                 y = np.einsum("N, Nqm->qm", a, self.decoders)
                 return np.ravel(y).tolist()
+
+            def error_logger(t):
+                if isinstance(self.error, int):
+                    return self.error
+                else:
+                    return np.sum(self.error, axis=(0, 1, 2))
+
+            self.learning_rule_error = nengo.Node(error_logger, size_in=0, size_out=1)
 
             # our prediction of the legendre coefficients that predict the future theta of our input
             self.Z = nengo.Node(
